@@ -1,10 +1,21 @@
-- 👋 Hey, I’m Pavneet Singh  
-- 🎓 Currently in Computer Engineering at University of Guelph 
-- 🌱 Currently learning CIS*2520	Data Structures &	CIS*2430	Object Oriented Programming
-- 🌱 Previously learnt CIS*2500	Intermediate Programming & 	CIS*1300	Programming
-- 📫 How to reach me pavneetsingh2301@gmail.com
+# Hi there, I'm Pavneet Singh 👋
 
-<!---
-pavneet-s/pavneet-s is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
-You can click the Preview link to take a look at your changes.
---->
+I'm a Computer Engineering student at the University of Guelph (graduating September 2025), passionate about technology, process optimization, and building efficient solutions.  
+
+🔹 **Technical Interests:**  
+- Technical Support and Troubleshooting  
+- Documentation Management and Workflow Automation  
+- Data Visualization and Reporting (Power BI, Excel)  
+- System Administration (Active Directory, Azure, Intune)
+
+🔹 **Tools & Technologies:**  
+Microsoft Office Suite | SharePoint | Power Automate | Power BI | GitHub | Linux | Windows | SQL | Node.js  
+
+🔹 **Current Focus:**  
+Enhancing technical operations through better workflows, documentation, and smart automation solutions.
+
+---
+
+📫 Feel free to connect with me:  
+[LinkedIn](https://linkedin.com/in/ppavneet) | [GitHub](https://github.com/pavneet-s)
+
