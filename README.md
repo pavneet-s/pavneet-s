@@ -1,6 +1,6 @@
 # Hi there, I'm Pavneet Singh 👋
 
-I'm a Computer Engineering student at the University of Guelph (graduating September 2025), passionate about technology, process optimization, and building efficient solutions.  
+I'm a Computer Engineering student at the University of Guelph, passionate about technology, process optimization, and building efficient solutions.  
 
 🔹 **Technical Interests:**  
 - Technical Support and Troubleshooting  
