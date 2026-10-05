@@ -110,13 +110,18 @@ jobs:
         with:
           name: workout-cycle-apk
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: smoke-test-screenshots
+          path: screenshots
+
       - name: Publish phone download link
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release delete workout-cycle-latest --yes --cleanup-tag || true
-          gh release create workout-cycle-latest workout-cycle.apk \
+          gh release create workout-cycle-latest workout-cycle.apk screenshots/*.png \
             --target "$GITHUB_SHA" \
             --title "Workout Cycle (latest build)" \
-            --notes "Built from ${GITHUB_SHA::7} on ${GITHUB_REF_NAME} and tested on an emulator. Open this page on your phone and tap workout-cycle.apk to install."
+            --notes "Built from ${GITHUB_SHA::7} on ${GITHUB_REF_NAME} and tested on an emulator; its screenshots are attached. Open this page on your phone and tap workout-cycle.apk to install."

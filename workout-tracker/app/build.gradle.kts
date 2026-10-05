@@ -56,7 +56,8 @@ kotlin {
 }
 
 room {
-    // Exported schemas are committed so future migrations can be generated and tested.
+    // Room writes each database version's schema here during builds. Upgrades are tested for
+    // real by the emulator job in .github/workflows/workout-cycle-apk.yml.
     schemaDirectory("$projectDir/schemas")
 }
 
