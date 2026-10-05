@@ -147,6 +147,8 @@ tap 'content-desc="Increase weight"'
 tap 'content-desc="Increase reps"'
 wait_for_exact "15" || fail "the weight stepper did not reach 15"
 wait_for_exact "10" || fail "the reps stepper did not start at 10"
+sleep 1 # let the weight stack light up its plates
+screenshot 1c-weight
 tap 'text="Done"'
 wait_for_text "Skip rest" || fail "no rest timer after Done"
 wait_for_text "3 of 5" || fail "Done did not advance to Shoulders"
