@@ -100,6 +100,7 @@ screenshot 1-active
 
 echo "== Log weight and reps, then rest"
 wait_for_text "First time" || fail "no first-time hint for an exercise never logged"
+wait_for_exact "None" || fail "an exercise never logged does not show None for weight and reps"
 tap 'content-desc="Increase weight"'
 tap 'content-desc="Increase weight"'
 tap 'content-desc="Increase weight"'
@@ -109,6 +110,7 @@ wait_for_exact "10" || fail "the reps stepper did not start at 10"
 tap 'text="Done"'
 wait_for_text "Skip rest" || fail "no rest timer after Done"
 wait_for_text "3 of 5" || fail "Done did not advance to Shoulders"
+wait_for_text "Get ready for Shoulders" || fail "the rest panel does not name the exercise after the rest"
 screenshot 2-rest
 wait_for_notification "Resting" || fail "the notification does not show the rest"
 tap 'text="Skip rest"'

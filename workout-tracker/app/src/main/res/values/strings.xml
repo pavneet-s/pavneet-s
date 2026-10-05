@@ -55,7 +55,8 @@
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
     <string name="edit">Edit</string>
-    <string name="value_empty">—</string>
+    <!-- A weight or rep count that hasn't been entered. -->
+    <string name="value_not_set">None</string>
     <string name="day_today">today</string>
     <string name="day_yesterday">yesterday</string>
     <string name="duration_seconds">%1$d s</string>
@@ -90,7 +91,7 @@
 
     <!-- Rest timer -->
     <string name="rest_title">Rest</string>
-    <string name="rest_next">Next: %1$s</string>
+    <string name="rest_get_ready">Get ready for %1$s</string>
     <string name="skip_rest">Skip rest</string>
     <string name="add_rest_time">+15 s</string>
 
@@ -155,7 +156,8 @@
     <string name="progress_up_since">Up %1$s since %2$s</string>
     <string name="progress_down_since">Down %1$s since %2$s</string>
     <string name="progress_same_since">No change since %1$s</string>
-    <string name="progress_first_entry">Logged once: %1$s, %2$s</string>
+    <!-- e.g. "First logged today. Log it on another day to see a chart." -->
+    <string name="progress_first_entry">First logged %1$s. Log it on another day to see a chart.</string>
     <!-- e.g. "Up 10 lb since Sep 3 · best 45 lb" -->
     <string name="progress_summary">%1$s · best %2$s</string>
     <!-- The tapped point on a progress chart: value, then date. -->

@@ -76,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -508,7 +509,7 @@ private fun SetPanel(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Stepper(
                 label = weightLabel,
-                value = entry.weight?.let(::formatWeight) ?: stringResource(R.string.value_empty),
+                value = entry.weight?.let(::formatWeight),
                 onDecrease = { onEntryChange(entry.copy(weight = unit.decrease(entry.weight))) },
                 onIncrease = { onEntryChange(entry.copy(weight = unit.increase(entry.weight))) },
                 onEdit = { editing = EditField.WEIGHT },
@@ -518,7 +519,7 @@ private fun SetPanel(
             )
             Stepper(
                 label = stringResource(R.string.reps_label),
-                value = entry.reps?.toString() ?: stringResource(R.string.value_empty),
+                value = entry.reps?.toString(),
                 onDecrease = { onEntryChange(entry.decreaseReps()) },
                 onIncrease = { onEntryChange(entry.increaseReps()) },
                 onEdit = { editing = EditField.REPS },
@@ -569,10 +570,11 @@ private fun lastSetHint(lastSet: LoggedSet?): String {
     return if (summary != null) stringResource(R.string.last_set, summary, day) else stringResource(R.string.last_done, day)
 }
 
+/** `null` [value] means not set: a muted "None", with − disabled since there's nothing to lower. */
 @Composable
 private fun Stepper(
     label: String,
-    value: String,
+    value: String?,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onEdit: () -> Unit,
@@ -588,11 +590,12 @@ private fun Stepper(
         )
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconButton(onClick = onDecrease, modifier = Modifier.size(48.dp)) {
+            FilledTonalIconButton(onClick = onDecrease, enabled = value != null, modifier = Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.ic_remove), contentDescription = decreaseDescription)
             }
             Text(
-                text = value,
+                text = value ?: stringResource(R.string.value_not_set),
+                color = if (value == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
@@ -670,7 +673,7 @@ private fun RestPanel(
                 .padding(vertical = 8.dp),
         )
         Text(
-            text = stringResource(R.string.rest_next, nextName),
+            text = stringResource(R.string.rest_get_ready, nextName),
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(12.dp))

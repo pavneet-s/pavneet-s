@@ -231,14 +231,19 @@ private fun ProgressCard(progress: ExerciseProgress, cardColor: androidx.compose
     } else {
         weight(abs(change))
     }
-    val changeText = when {
-        progress.points.size < 2 -> stringResource(R.string.progress_first_entry, weight(first.weight), relativeDay(first.date))
-        change == 0.0 -> stringResource(R.string.progress_same_since, relativeDay(first.date))
-        else -> stringResource(
-            if (change > 0) R.string.progress_up_since else R.string.progress_down_since,
-            amount,
-            relativeDay(first.date),
-        )
+    // One day of data has no trend (or chart) yet, and its best is the weight already shown.
+    val summary = if (progress.points.size < 2) {
+        stringResource(R.string.progress_first_entry, relativeDay(first.date))
+    } else {
+        val changeText = when {
+            change == 0.0 -> stringResource(R.string.progress_same_since, relativeDay(first.date))
+            else -> stringResource(
+                if (change > 0) R.string.progress_up_since else R.string.progress_down_since,
+                amount,
+                relativeDay(first.date),
+            )
+        }
+        stringResource(R.string.progress_summary, changeText, weight(progress.best))
     }
     HistoryCard(
         title = progress.exerciseName,
@@ -252,7 +257,7 @@ private fun ProgressCard(progress: ExerciseProgress, cardColor: androidx.compose
         },
     ) {
         Text(
-            text = stringResource(R.string.progress_summary, changeText, weight(progress.best)),
+            text = summary,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
