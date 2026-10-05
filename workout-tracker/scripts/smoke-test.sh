@@ -43,9 +43,9 @@ wait_for() {
 wait_for_text() { wait_for text "$1"; }
 wait_for_desc() { wait_for content-desc "$1"; }
 
-# The text of the figure's speech bubble (tagged "form_tip"), or nothing if it isn't shown.
+# The tip in the figure's speech bubble (its text is tagged "form_tip_text"), or nothing.
 tip_text() {
-  screen | grep -o '<node [^>]*resource-id="form_tip"[^>]*>' | grep -o ' text="[^"]*"' | head -n 1
+  screen | grep -o '<node [^>]*resource-id="form_tip_text"[^>]*>' | grep -o ' text="[^"]\+"' | head -n 1
 }
 
 # Swipes the exercise pager: "left" shows the next cable exercise, "right" the previous one.

@@ -239,7 +239,7 @@ private fun SpeechBubble(text: String, style: TextStyle, tailX: () -> Float, onC
             },
             label = "formTip",
         ) { tip ->
-            Text(tip, style = style, color = MaterialTheme.colorScheme.onSurface)
+            Text(tip, style = style, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.testTag("form_tip_text"))
         }
     }
 }
