@@ -16,6 +16,9 @@ mkdir -p "$SHOTS"
 fail() {
   echo "::error::Smoke test failed: $1"
   adb exec-out screencap -p > "$SHOTS/failure.png" || true
+  echo "--- on screen ---"
+  adb shell uiautomator dump /sdcard/window.xml 2>&1 | tail -n 1 || true
+  adb shell cat /sdcard/window.xml 2>/dev/null | grep -o '\(text\|content-desc\)="[^"]\+"' | head -n 80 || true
   echo "--- notifications ---"
   adb shell dumpsys notification --noredact | grep -E "android\.(title|text)=" || true
   echo "--- crash log ---"
@@ -138,13 +141,25 @@ adb shell cmd statusbar collapse
 wait_for_text "4 of 5" || fail "Done in the notification did not complete the set"
 wait_for_text "Skip rest" || fail "Done in the notification did not start a rest"
 
-echo "== Shorten the rest in Settings and wait for the rest-over alert"
 tap 'text="Skip rest"'
+wait_for_exact "Done" || fail "Skip rest did not bring back the Done button"
+
+echo "== History"
+tap 'content-desc="History"'
+wait_for_text "Day streak" || fail "the History screen never appeared"
+wait_for_text "Training days" || fail "no training calendar"
+wait_for_text "Back stretches" || fail "History does not list the logged exercise"
+screenshot 6-history
+adb shell input keyevent KEYCODE_BACK
+wait_for_exact "Done" || fail "could not get back to the workout from History"
+
+# Last, because the rest-over alert drops down over the top of the screen.
+echo "== Shorten the rest in Settings and wait for the rest-over alert"
 tap 'content-desc="More options"'
 tap 'text="Settings"'
 wait_for_text "Rest between sets" || fail "the Settings screen never appeared"
 tap 'text="30 s"'
-screenshot 6-settings
+screenshot 7-settings
 adb shell input keyevent KEYCODE_BACK
 wait_for_exact "Done" || fail "no Done button after Settings"
 tap 'text="Done"'
@@ -152,12 +167,5 @@ wait_for_text "Skip rest" || fail "no rest after the third set"
 wait_for_notification "Rest over" 45 || fail "no rest-over alert after a 30 s rest"
 wait_for_exact "Done" || fail "the Done button did not come back after the rest"
 
-echo "== History"
-tap 'content-desc="History"'
-wait_for_text "Day streak" || fail "the History screen never appeared"
-wait_for_text "Training days" || fail "no training calendar"
-wait_for_text "Back stretches" || fail "History does not list the logged exercise"
-screenshot 7-history
-
 adb shell pidof "$PACKAGE" >/dev/null || fail "the app is no longer running"
-echo "Smoke test passed: upgrades kept progress; logging, rest, setup, notification Done, rest alert and history work."
+echo "Smoke test passed: upgrades kept progress; logging, rest, setup, notification Done, history and the rest alert work."
