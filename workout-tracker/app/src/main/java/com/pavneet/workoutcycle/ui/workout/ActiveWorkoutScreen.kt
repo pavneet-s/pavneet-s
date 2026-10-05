@@ -2,6 +2,7 @@ package com.pavneet.workoutcycle.ui.workout
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -72,8 +73,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pavneet.workoutcycle.R
+import com.pavneet.workoutcycle.domain.CableMovement
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.WorkoutCycle
+import com.pavneet.workoutcycle.ui.cable.CableMachineAnimation
+import com.pavneet.workoutcycle.ui.cable.labelRes
 import com.pavneet.workoutcycle.ui.theme.WorkoutCycleTheme
 import kotlinx.coroutines.flow.collectLatest
 
@@ -189,12 +193,25 @@ private fun WorkoutTopBar(canRestart: Boolean, onRestart: () -> Unit, onManageCy
 
 @Composable
 private fun ActiveWorkoutContent(state: ActiveWorkoutUiState.Active, modifier: Modifier = Modifier) {
+    val movement = state.current.movement
     Column(
         modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         RoundProgress(state)
-        Spacer(Modifier.weight(1f))
+        // The demo takes the free space; without one the name sits in the middle instead.
+        if (movement != null) {
+            Spacer(Modifier.height(16.dp))
+            CableDemo(
+                movement = movement,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         Text(
             text = stringResource(R.string.now).uppercase(),
             style = MaterialTheme.typography.labelLarge,
@@ -202,8 +219,40 @@ private fun ActiveWorkoutContent(state: ActiveWorkoutUiState.Active, modifier: M
         )
         Spacer(Modifier.height(8.dp))
         CurrentExerciseName(state)
-        Spacer(Modifier.weight(1f))
+        Spacer(if (movement != null) Modifier.height(16.dp) else Modifier.weight(1f))
         UpNextCard(state.upNext)
+    }
+}
+
+/** The looping cable-machine demo plus which movement it is and where to set the pulley. */
+@Composable
+private fun CableDemo(movement: CableMovement, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Crossfade(
+            targetState = movement,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            label = "cableDemo",
+        ) { shown ->
+            CableMachineAnimation(
+                movement = shown,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(MaterialTheme.shapes.extraLarge),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(
+                R.string.cable_caption,
+                stringResource(movement.labelRes),
+                stringResource(movement.pulley.labelRes),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

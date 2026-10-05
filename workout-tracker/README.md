@@ -10,10 +10,24 @@ Built with Kotlin, Jetpack Compose and Material 3, and tuned for a modern phone 
 
 | Screen | What it does |
 | --- | --- |
-| **Active workout** | Shows the current exercise in large type, what's up next, and progress through the round (segments, round number, sets done). The Done button sits in thumb reach with a haptic confirm. A snackbar offers **Undo** after each set, and the screen stays awake. |
-| **Manage exercises** | Add exercises, switch one off to **skip** it without losing its slot, delete it, or **drag the handle to reorder**. TalkBack users get *Move up / Move down* actions instead of dragging. |
+| **Active workout** | Shows the current exercise in large type with a looping **cable-machine animation** of the movement and where to set the pulley. It also shows what's up next and progress through the round (segments, round number, sets done). The Done button sits in thumb reach with a haptic confirm. A snackbar offers **Undo** after each set, and the screen stays awake. |
+| **Manage exercises** | Add exercises, switch one off to **skip** it without losing its slot, delete it, or **drag the handle to reorder**. Each exercise has a chip that opens a **picker with live previews** of every cable movement. TalkBack users get *Move up / Move down* actions instead of dragging. |
 
-## Running it
+## Installing on a phone without a computer
+
+Every push that changes `workout-tracker/` runs two GitHub Actions workflows:
+
+- **Workout Cycle APK** runs the unit tests, builds the app and publishes it at
+  https://github.com/pavneet-s/pavneet-s/releases/download/workout-cycle-latest/workout-cycle.apk.
+  Open that link on the phone to install or update.
+- **Workout Cycle smoke test** installs the previous release on an Android emulator and makes
+  progress. It then upgrades to the new build and checks that the progress survived, the
+  animations show and the picker saves a choice. Screenshots are kept as a run artifact.
+
+Debug builds are signed with the committed `app/debug.keystore`, so cloud and local builds
+can update each other without an uninstall, which would wipe saved progress.
+
+## Running it from Android Studio
 
 1. Open the `workout-tracker/` folder in Android Studio. Use a recent version, which bundles JDK 17+.
 2. Let Gradle sync. Install SDK Platform 36 if Studio prompts for it.
@@ -84,9 +98,27 @@ How the cyclical list behaves:
 | Table | Columns | Notes |
 | --- | --- | --- |
 | `cycles` | `id`, `name`, `current_exercise_id`, `sets_completed`, `rounds_completed` | One row today, seeded on first launch. |
-| `exercises` | `id`, `cycle_id` → `cycles.id`, `name`, `position`, `is_active` | `position` is rewritten on each save. |
+| `exercises` | `id`, `cycle_id` → `cycles.id`, `name`, `position`, `is_active`, `animation` | `position` is rewritten on each save. `animation` is `NULL` (guess from the name), `OFF`, or a movement name; added in version 2. |
 
 The repository observes a `@Transaction` query that returns `CycleWithExercises` (`@Embedded` cycle plus a `@Relation` to its exercises). A change to both tables is therefore never seen half-applied. Keying exercises by `cycle_id` also leaves room for several routines later, such as "Push day" and "Pull day".
+
+## Cable machine animations
+
+Each exercise shows a looping stick-figure demo on a cable tower. The weight stack rises as
+the handle moves away from the pulley, and there's a short squeeze at the top of each rep.
+
+- **Movements:** chest press, row, straight-arm pulldown, face pull, lateral raise (front
+  view), triceps pushdown, overhead triceps extension and curl.
+- **Choosing one:** an exercise's animation is guessed from its name. "Push-ups" maps to the
+  chest press, "Back" to the row, "Shoulders" to the lateral raise, and so on; see
+  `CableMovement.guessFor`. A different movement, or none, can be picked on the manage screen.
+  The choice is stored in `exercises.animation`, added by the version 1 to 2 database migration.
+- **How it's built:** the poses (`ui/cable/CablePoses.kt`) and drawing (`ui/cable/CableDrawing.kt`)
+  are plain Kotlin. They use inverse kinematics for the multi-joint presses and rows, and
+  produce lines, circles and boxes in a fixed 100 × 86 scene. `CableMachineAnimation` draws
+  those on a Compose `Canvas`, coloured from the Material theme, and redraws in the draw phase
+  only. Being plain Kotlin, the geometry is unit-tested on the JVM: limbs keep their length,
+  feet stay on the floor, and nothing leaves the frame or passes through the machine.
 
 ## Drag and drop
 
@@ -111,15 +143,18 @@ The repository observes a `@Transaction` query that returns `CycleWithExercises`
 app/src/main/java/com/pavneet/workoutcycle/
 ├── WorkoutCycleApp.kt          Application + AppContainer (manual DI)
 ├── MainActivity.kt             edge-to-edge, theme, nav host
-├── domain/WorkoutCycle.kt      Exercise + WorkoutCycle: all cycle rules
+├── domain/
+│   ├── WorkoutCycle.kt         Exercise + WorkoutCycle: all cycle rules
+│   └── CableMovement.kt        cable movements, pulley heights, name guessing
 ├── data/
 │   ├── WorkoutRepository.kt    load → transform → save, Flow<WorkoutCycle>
 │   └── local/                  Room entities, DAO, database (+ default seed)
 └── ui/
     ├── WorkoutNavHost.kt       type-safe Navigation Compose routes
+    ├── cable/                  pose engine, drawing and the Compose animation
     ├── theme/Theme.kt
     ├── workout/                Active workout screen + ViewModel
-    └── manage/                 Manage exercises screen + ViewModel
+    └── manage/                 Manage exercises screen, animation picker + ViewModel
 ```
 
 ## Ideas for next steps

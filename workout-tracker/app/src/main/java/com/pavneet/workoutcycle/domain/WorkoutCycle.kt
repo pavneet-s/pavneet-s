@@ -10,7 +10,16 @@ data class Exercise(
     val id: Long,
     val name: String,
     val isActive: Boolean = true,
-)
+    val animation: AnimationSetting = AnimationSetting.Auto,
+) {
+    /** The cable movement to animate, or `null` for none. */
+    val movement: CableMovement?
+        get() = when (animation) {
+            AnimationSetting.Auto -> CableMovement.guessFor(name)
+            AnimationSetting.Off -> null
+            is AnimationSetting.Fixed -> animation.movement
+        }
+}
 
 /**
  * Immutable snapshot of the cyclical workout. Every operation returns a new snapshot, so the
@@ -84,6 +93,11 @@ data class WorkoutCycle(
         val idsInOrder = reordered.map { it.id }.toSet()
         return copy(exercises = reordered + exercises.filterNot { it.id in idsInOrder }).normalized()
     }
+
+    /** Chooses how [exerciseId] is animated; the rotation itself is unchanged. */
+    fun setAnimation(exerciseId: Long, animation: AnimationSetting): WorkoutCycle = copy(
+        exercises = exercises.map { if (it.id == exerciseId) it.copy(animation = animation) else it },
+    )
 
     /** Starts over from the first active exercise with fresh counters. */
     fun restart(): WorkoutCycle = copy(

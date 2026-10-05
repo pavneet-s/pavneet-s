@@ -4,6 +4,8 @@ import androidx.room.withTransaction
 import com.pavneet.workoutcycle.data.local.CycleWithExercises
 import com.pavneet.workoutcycle.data.local.ExerciseEntity
 import com.pavneet.workoutcycle.data.local.WorkoutDatabase
+import com.pavneet.workoutcycle.domain.AnimationSetting
+import com.pavneet.workoutcycle.domain.CableMovement
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 import kotlinx.coroutines.flow.Flow
@@ -63,6 +65,9 @@ class WorkoutRepository(
 
     suspend fun reorder(orderedIds: List<Long>) = update { it.reorder(orderedIds) }
 
+    suspend fun setExerciseAnimation(exerciseId: Long, animation: AnimationSetting) =
+        update { it.setAnimation(exerciseId, animation) }
+
     private suspend fun update(transform: (WorkoutCycle) -> WorkoutCycle) {
         database.withTransaction {
             val before = load()
@@ -87,6 +92,7 @@ class WorkoutRepository(
                         name = exercise.name,
                         position = position,
                         isActive = exercise.isActive,
+                        animation = exercise.animation.encode(),
                     )
                 },
             )
@@ -97,9 +103,30 @@ class WorkoutRepository(
     private fun CycleWithExercises.toDomain() = WorkoutCycle(
         exercises = exercises
             .sortedBy { it.position }
-            .map { Exercise(id = it.id, name = it.name, isActive = it.isActive) },
+            .map {
+                Exercise(id = it.id, name = it.name, isActive = it.isActive, animation = decodeAnimation(it.animation))
+            },
         currentExerciseId = cycle.currentExerciseId,
         setsCompleted = cycle.setsCompleted,
         roundsCompleted = cycle.roundsCompleted,
     )
+
+    private fun AnimationSetting.encode(): String? = when (this) {
+        AnimationSetting.Auto -> null
+        AnimationSetting.Off -> ANIMATION_OFF
+        is AnimationSetting.Fixed -> movement.name
+    }
+
+    // An unknown name (e.g. a movement removed in a later version) falls back to guessing.
+    private fun decodeAnimation(value: String?): AnimationSetting = when (value) {
+        null -> AnimationSetting.Auto
+        ANIMATION_OFF -> AnimationSetting.Off
+        else -> CableMovement.entries.firstOrNull { it.name == value }
+            ?.let { AnimationSetting.Fixed(it) }
+            ?: AnimationSetting.Auto
+    }
+
+    private companion object {
+        const val ANIMATION_OFF = "OFF"
+    }
 }

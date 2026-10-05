@@ -31,4 +31,22 @@
     <string name="status_skipped">Skipped</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
+
+    <!-- Cable machine animations -->
+    <string name="movement_chest_press">Cable chest press</string>
+    <string name="movement_row">Cable row</string>
+    <string name="movement_straight_arm_pulldown">Straight-arm pulldown</string>
+    <string name="movement_face_pull">Face pull</string>
+    <string name="movement_lateral_raise">Cable lateral raise</string>
+    <string name="movement_triceps_pushdown">Triceps pushdown</string>
+    <string name="movement_overhead_triceps_extension">Overhead triceps extension</string>
+    <string name="movement_biceps_curl">Cable curl</string>
+    <string name="animation_off">No animation</string>
+    <string name="pulley_high">Pulley high</string>
+    <string name="pulley_chest">Pulley at chest height</string>
+    <string name="pulley_low">Pulley low</string>
+    <!-- Caption under the animation, e.g. "Cable row · Pulley at chest height". -->
+    <string name="cable_caption">%1$s · %2$s</string>
+    <string name="animation_picker_title">Animation for %1$s</string>
+    <string name="animation_chip_description">Animation for %1$s: %2$s</string>
 </resources>

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pavneet.workoutcycle.WorkoutCycleApp
 import com.pavneet.workoutcycle.data.WorkoutRepository
+import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.Exercise
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,10 @@ class ManageCycleViewModel(private val repository: WorkoutRepository) : ViewMode
 
     fun setExerciseActive(exerciseId: Long, active: Boolean) {
         viewModelScope.launch { repository.setExerciseActive(exerciseId, active) }
+    }
+
+    fun setExerciseAnimation(exerciseId: Long, animation: AnimationSetting) {
+        viewModelScope.launch { repository.setExerciseAnimation(exerciseId, animation) }
     }
 
     /** Called once per drop (not per frame of the drag) with the full new order. */

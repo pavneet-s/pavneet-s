@@ -4,10 +4,11 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 
-@Database(entities = [CycleEntity::class, ExerciseEntity::class], version = 1)
+@Database(entities = [CycleEntity::class, ExerciseEntity::class], version = 2)
 abstract class WorkoutDatabase : RoomDatabase() {
 
     abstract fun workoutDao(): WorkoutDao
@@ -18,7 +19,15 @@ abstract class WorkoutDatabase : RoomDatabase() {
         fun build(context: Context): WorkoutDatabase =
             Room.databaseBuilder(context, WorkoutDatabase::class.java, "workout-cycle.db")
                 .addCallback(SeedDefaultCycle)
+                .addMigrations(MIGRATION_1_2)
                 .build()
+
+        /** v2 adds the per-exercise animation choice; existing rows keep guessing from their name. */
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE exercises ADD COLUMN animation TEXT")
+            }
+        }
     }
 
     /** Seeds the default rotation once, when the database file is first created. */

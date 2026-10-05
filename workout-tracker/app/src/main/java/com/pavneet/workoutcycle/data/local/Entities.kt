@@ -40,6 +40,8 @@ data class ExerciseEntity(
     /** 0-based slot in the rotation; rewritten for every exercise on each save. */
     val position: Int,
     @ColumnInfo(name = "is_active") val isActive: Boolean,
+    /** `null` = guess from the name, "OFF" = no animation, otherwise a CableMovement name. Added in v2. */
+    val animation: String? = null,
 )
 
 /**

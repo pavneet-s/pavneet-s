@@ -22,6 +22,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -62,8 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pavneet.workoutcycle.R
+import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.WorkoutCycle
+import com.pavneet.workoutcycle.ui.cable.labelRes
 import com.pavneet.workoutcycle.ui.theme.WorkoutCycleTheme
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -81,6 +86,7 @@ fun ManageCycleRoute(
         onRemoveExercise = viewModel::removeExercise,
         onExerciseActiveChange = viewModel::setExerciseActive,
         onReorder = viewModel::reorder,
+        onExerciseAnimationChange = viewModel::setExerciseAnimation,
     )
 }
 
@@ -93,8 +99,11 @@ fun ManageCycleScreen(
     onRemoveExercise: (exerciseId: Long) -> Unit,
     onExerciseActiveChange: (exerciseId: Long, active: Boolean) -> Unit,
     onReorder: (orderedIds: List<Long>) -> Unit,
+    onExerciseAnimationChange: (exerciseId: Long, animation: AnimationSetting) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var animationPickerFor by rememberSaveable { mutableStateOf<Long?>(null) }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -133,6 +142,7 @@ fun ManageCycleScreen(
                     onRemove = onRemoveExercise,
                     onActiveChange = onExerciseActiveChange,
                     onReorder = onReorder,
+                    onAnimationClick = { exerciseId -> animationPickerFor = exerciseId },
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -142,6 +152,15 @@ fun ManageCycleScreen(
                 )
             }
         }
+    }
+
+    uiState.exercises.firstOrNull { it.id == animationPickerFor }?.let { exercise ->
+        AnimationPickerSheet(
+            exerciseName = exercise.name,
+            selected = exercise.movement,
+            onSelect = { animation -> onExerciseAnimationChange(exercise.id, animation) },
+            onDismiss = { animationPickerFor = null },
+        )
     }
 }
 
@@ -187,6 +206,7 @@ private fun ReorderableExerciseList(
     onRemove: (exerciseId: Long) -> Unit,
     onActiveChange: (exerciseId: Long, active: Boolean) -> Unit,
     onReorder: (orderedIds: List<Long>) -> Unit,
+    onAnimationClick: (exerciseId: Long) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -245,6 +265,7 @@ private fun ReorderableExerciseList(
                     ),
                     onActiveChange = { active -> onActiveChange(exercise.id, active) },
                     onRemove = { onRemove(exercise.id) },
+                    onAnimationClick = { onAnimationClick(exercise.id) },
                     // Merged so TalkBack focuses the row as one item and offers the move actions.
                     modifier = Modifier.semantics(mergeDescendants = true) {
                         customActions = listOf(
@@ -258,6 +279,7 @@ private fun ReorderableExerciseList(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExerciseRow(
     exercise: Exercise,
@@ -266,6 +288,7 @@ private fun ExerciseRow(
     dragHandleModifier: Modifier,
     onActiveChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
+    onAnimationClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "dragElevation")
@@ -292,6 +315,7 @@ private fun ExerciseRow(
             Column(
                 Modifier
                     .weight(1f)
+                    .padding(top = 10.dp, bottom = 2.dp)
                     .alpha(if (exercise.isActive) 1f else 0.5f),
             ) {
                 Text(
@@ -311,6 +335,21 @@ private fun ExerciseRow(
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
+                val animationLabel = exercise.movement?.let { stringResource(it.labelRes) }
+                    ?: stringResource(R.string.animation_off)
+                val chipDescription = stringResource(R.string.animation_chip_description, exercise.name, animationLabel)
+                AssistChip(
+                    onClick = onAnimationClick,
+                    label = { Text(animationLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(AssistChipDefaults.IconSize),
+                        )
+                    },
+                    modifier = Modifier.semantics { contentDescription = chipDescription },
+                )
             }
             val includeDescription = stringResource(R.string.include_in_rotation, exercise.name)
             Switch(
@@ -339,6 +378,7 @@ private fun ManageCycleScreenPreview() {
             onRemoveExercise = {},
             onExerciseActiveChange = { _, _ -> },
             onReorder = {},
+            onExerciseAnimationChange = { _, _ -> },
         )
     }
 }
