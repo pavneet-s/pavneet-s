@@ -27,9 +27,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +64,7 @@ import com.pavneet.workoutcycle.domain.StackLoad
 import com.pavneet.workoutcycle.ui.Haptic
 import com.pavneet.workoutcycle.ui.cable.CableMachineAnimation
 import com.pavneet.workoutcycle.ui.cable.CablePoses
+import com.pavneet.workoutcycle.ui.cable.CableScene
 import com.pavneet.workoutcycle.ui.cable.SceneFit
 import com.pavneet.workoutcycle.ui.cable.labelRes
 import com.pavneet.workoutcycle.ui.cable.tipsRes
@@ -80,6 +83,21 @@ private val BUBBLE_PADDING_V = 8.dp
 private val BUBBLE_RADIUS = 16.dp
 private val TAIL_WIDTH = 14.dp
 private val TAIL_HEIGHT = 10.dp
+
+/** The narrowest bubble worth putting beside the figure; anything less goes above it. */
+private val SIDE_BUBBLE_MIN_WIDTH = 140.dp
+
+/** Which edge of the bubble its tail comes out of: the bottom, or the right side. */
+private enum class TailSide { BOTTOM, END }
+
+/** Where the bubble's tail goes. Set while laying out, read while drawing. */
+@Stable
+private class BubbleTail {
+    var side by mutableStateOf(TailSide.BOTTOM)
+
+    /** Along that edge, from its start. */
+    var offset by mutableFloatStateOf(0f)
+}
 
 /**
  * A muscle group's cable exercises, one page each: swipe to pick the one you're doing. Each
@@ -157,8 +175,11 @@ fun CableExercisePager(
 }
 
 /**
- * The looping demo with a speech bubble above the figure's head, cycling through [movement]'s
+ * The looping demo with a speech bubble by the figure's head, cycling through [movement]'s
  * common mistakes. Tap the bubble for the next one.
+ *
+ * On a card that is wide for its height, the bubble sits beside the figure so the scene keeps
+ * its full size; otherwise it sits above, and the scene shrinks to fit underneath.
  */
 @Composable
 private fun TalkingCableDemo(movement: CableMovement, load: StackLoad, modifier: Modifier = Modifier) {
@@ -174,14 +195,14 @@ private fun TalkingCableDemo(movement: CableMovement, load: StackLoad, modifier:
     val textStyle = MaterialTheme.typography.bodySmall
     val measurer = rememberTextMeasurer()
     val head = remember(movement) { CablePoses.frame(movement, 0f).head }
-    var tailX by remember { mutableFloatStateOf(0f) }
+    val tail = remember { BubbleTail() }
 
     Layout(
         content = {
             SpeechBubble(
                 text = tips[tipIndex],
                 style = textStyle,
-                tailX = { tailX },
+                tail = tail,
                 onClick = {
                     haptics.perform(Haptic.SELECT)
                     tipIndex = (tipIndex + 1) % tips.size
@@ -194,35 +215,56 @@ private fun TalkingCableDemo(movement: CableMovement, load: StackLoad, modifier:
         val width = constraints.maxWidth
         val height = constraints.maxHeight
         val margin = BUBBLE_MARGIN.roundToPx()
-        val tail = TAIL_HEIGHT.roundToPx()
-        val bubbleMaxWidth = width - 2 * margin
-        // Room for the longest tip, so the figure doesn't change size as the tips rotate.
-        val textConstraints = Constraints(maxWidth = (bubbleMaxWidth - 2 * BUBBLE_PADDING_H.roundToPx()).coerceAtLeast(1))
-        val band = tips.maxOf { measurer.measure(it, textStyle, constraints = textConstraints).size.height } +
-            2 * BUBBLE_PADDING_V.roundToPx()
-        val bubble = measurables[0].measure(Constraints(maxWidth = bubbleMaxWidth))
-        val sceneTop = margin + band + tail
-        val scene = measurables[1].measure(Constraints.fixed(width, (height - sceneTop).coerceAtLeast(1)))
-        // Centre the bubble over the head where it fits, with its tail pointing down at it.
-        val headX = SceneFit(Size(width.toFloat(), scene.height.toFloat())).toOffset(head).x
-        val bubbleX = (headX - bubble.width / 2f).roundToInt().coerceIn(margin, max(margin, width - margin - bubble.width))
-        layout(width, height) {
-            tailX = headX - bubbleX
-            bubble.place(bubbleX, sceneTop - tail - bubble.height)
-            scene.place(0, sceneTop)
+        val tailLength = TAIL_HEIGHT.roundToPx()
+
+        // Beside: the scene at full size against the right edge, and the bubble in the room to
+        // the left of the figure (including the strip of the scene that poses keep clear).
+        val fullScale = SceneFit(Size(width.toFloat(), height.toFloat())).scale
+        val sceneWidth = (CableScene.VIEW_WIDTH * fullScale).roundToInt()
+        val sceneLeft = width - sceneWidth - margin
+        val sideWidth = sceneLeft + (CableScene.CLEAR_LEFT * fullScale).roundToInt() - margin - tailLength
+        if (sceneLeft >= 0 && sideWidth >= SIDE_BUBBLE_MIN_WIDTH.roundToPx()) {
+            val bubble = measurables[0].measure(Constraints(maxWidth = sideWidth, maxHeight = (height - 2 * margin).coerceAtLeast(0)))
+            val scene = measurables[1].measure(Constraints.fixed(sceneWidth, height))
+            val headY = SceneFit(Size(sceneWidth.toFloat(), height.toFloat())).toOffset(head).y
+            val bubbleY = (headY - bubble.height / 2f).roundToInt().coerceIn(margin, max(margin, height - margin - bubble.height))
+            layout(width, height) {
+                tail.side = TailSide.END
+                tail.offset = headY - bubbleY
+                scene.place(sceneLeft, 0)
+                bubble.place(margin, bubbleY)
+            }
+        } else {
+            // Above: room for the longest tip, so the figure doesn't change size as tips rotate.
+            val bubbleMaxWidth = width - 2 * margin
+            val textConstraints = Constraints(maxWidth = (bubbleMaxWidth - 2 * BUBBLE_PADDING_H.roundToPx()).coerceAtLeast(1))
+            val band = tips.maxOf { measurer.measure(it, textStyle, constraints = textConstraints).size.height } +
+                2 * BUBBLE_PADDING_V.roundToPx()
+            val bubble = measurables[0].measure(Constraints(maxWidth = bubbleMaxWidth))
+            val sceneTop = margin + band + tailLength
+            val scene = measurables[1].measure(Constraints.fixed(width, (height - sceneTop).coerceAtLeast(1)))
+            // Centred over the head where it fits, with the tail pointing down at it.
+            val headX = SceneFit(Size(width.toFloat(), scene.height.toFloat())).toOffset(head).x
+            val bubbleX = (headX - bubble.width / 2f).roundToInt().coerceIn(margin, max(margin, width - margin - bubble.width))
+            layout(width, height) {
+                tail.side = TailSide.BOTTOM
+                tail.offset = headX - bubbleX
+                bubble.place(bubbleX, sceneTop - tailLength - bubble.height)
+                scene.place(0, sceneTop)
+            }
         }
     }
 }
 
-/** [text] in a rounded bubble whose tail, [tailX] from its left edge, points down at the speaker. */
+/** [text] in a rounded bubble whose [tail] points at the speaker. */
 @Composable
-private fun SpeechBubble(text: String, style: TextStyle, tailX: () -> Float, onClick: () -> Unit) {
+private fun SpeechBubble(text: String, style: TextStyle, tail: BubbleTail, onClick: () -> Unit) {
     val fill = MaterialTheme.colorScheme.surfaceBright
     val outline = MaterialTheme.colorScheme.outlineVariant
     Box(
         Modifier
             .drawBehind {
-                val path = bubblePath(size, tailX(), BUBBLE_RADIUS.toPx(), TAIL_WIDTH.toPx(), TAIL_HEIGHT.toPx())
+                val path = bubblePath(size, tail.side, tail.offset, BUBBLE_RADIUS.toPx(), TAIL_WIDTH.toPx(), TAIL_HEIGHT.toPx())
                 drawPath(path, fill)
                 drawPath(path, outline, style = Stroke(1.dp.toPx()))
             }
@@ -244,16 +286,27 @@ private fun SpeechBubble(text: String, style: TextStyle, tailX: () -> Float, onC
     }
 }
 
-private fun bubblePath(size: Size, tailX: Float, radius: Float, tailWidth: Float, tailHeight: Float): Path {
+private fun bubblePath(size: Size, side: TailSide, offset: Float, radius: Float, tailWidth: Float, tailLength: Float): Path {
     val body = Path().apply {
         addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)))
     }
-    val x = tailX.coerceIn(radius + tailWidth / 2f, max(radius + tailWidth / 2f, size.width - radius - tailWidth / 2f))
-    // Overlaps the body by a pixel so the two merge without a seam.
+    // Kept clear of the rounded corners, and overlapping the body by a pixel so there's no seam.
+    fun along(edge: Float) = offset.coerceIn(radius + tailWidth / 2f, max(radius + tailWidth / 2f, edge - radius - tailWidth / 2f))
     val tail = Path().apply {
-        moveTo(x - tailWidth / 2f, size.height - 1f)
-        lineTo(x + tailWidth / 2f, size.height - 1f)
-        lineTo(x, size.height + tailHeight)
+        when (side) {
+            TailSide.BOTTOM -> {
+                val x = along(size.width)
+                moveTo(x - tailWidth / 2f, size.height - 1f)
+                lineTo(x + tailWidth / 2f, size.height - 1f)
+                lineTo(x, size.height + tailLength)
+            }
+            TailSide.END -> {
+                val y = along(size.height)
+                moveTo(size.width - 1f, y - tailWidth / 2f)
+                lineTo(size.width - 1f, y + tailWidth / 2f)
+                lineTo(size.width + tailLength, y)
+            }
+        }
         close()
     }
     return Path.combine(PathOperation.Union, body, tail)

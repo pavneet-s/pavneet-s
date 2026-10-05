@@ -56,6 +56,9 @@ object CableScene {
     const val PULLEY_RADIUS = 2f
     const val HEAD_RADIUS = 4.4f
 
+    /** Every pose stays right of this, so the strip to its left is free for overlays. */
+    const val CLEAR_LEFT = 20f
+
     fun pulleyY(height: PulleyHeight) = when (height) {
         PulleyHeight.HIGH -> 22f
         PulleyHeight.CHEST -> 49f

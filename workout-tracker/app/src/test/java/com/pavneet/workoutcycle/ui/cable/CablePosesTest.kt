@@ -68,6 +68,7 @@ class CablePosesTest {
         for (point in bodyPoints) {
             assertTrue("$movement t=$t $point is off screen", point.x in CableScene.VIEW_LEFT..right && point.y in CableScene.VIEW_TOP..bottom)
             assertTrue("$movement t=$t $point is inside the machine", point.x < CableScene.COLUMN_LEFT)
+            assertTrue("$movement t=$t $point is in the strip kept clear for the speech bubble", point.x > CableScene.CLEAR_LEFT)
         }
         assertTrue("$movement t=$t head cut off", frame.head.y - CableScene.HEAD_RADIUS >= CableScene.VIEW_TOP)
     }

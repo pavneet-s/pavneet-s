@@ -53,8 +53,8 @@ swipe_pager() {
   local bounds width y
   bounds=$(screen | grep -o '<node [^>]*resource-id="form_tip"[^>]*>' | grep -o 'bounds="[^"]*"' | head -n 1)
   [ -n "$bounds" ] || fail "no speech bubble to swipe the pager by"
-  # Just below the bubble, over the animation.
-  y=$(echo "$bounds" | tr -c '0-9' ' ' | awk '{ print $4 + 120 }')
+  # Across the middle of the bubble, which sits inside the page being swiped.
+  y=$(echo "$bounds" | tr -c '0-9' ' ' | awk '{ print int(($2 + $4) / 2) }')
   width=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -n 1 | cut -dx -f1)
   if [ "$1" = left ]; then
     adb shell input swipe $((width * 4 / 5)) "$y" $((width / 5)) "$y" 300
