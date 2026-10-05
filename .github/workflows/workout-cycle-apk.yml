@@ -1,5 +1,5 @@
-# Builds the Workout Cycle Android app on GitHub's servers, so no computer is needed.
-# Each run publishes the installable file at:
+# Builds the Workout Cycle app on GitHub's servers, tests that exact APK on an Android
+# emulator, and only then publishes it, so the phone download link never gets a broken build:
 # https://github.com/pavneet-s/pavneet-s/releases/download/workout-cycle-latest/workout-cycle.apk
 name: Workout Cycle APK
 
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # needed to publish the APK as a release
+  contents: read
 
 concurrency:
   group: workout-cycle-apk-${{ github.ref }}
@@ -37,15 +37,78 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest
 
       - name: Build APK
-        run: ./gradlew :app:assembleDebug
-
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk workout-cycle.apk
+        run: |
+          ./gradlew :app:assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk workout-cycle.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: workout-cycle-apk
           path: workout-tracker/workout-cycle.apk
+
+  # Installs the previous release, makes progress, upgrades to the new APK in place (running any
+  # database migration) and taps through the main flows. See workout-tracker/scripts/smoke-test.sh.
+  emulator-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # The first release installed on a phone (database version 1). Upgrades are tested from it.
+      BASELINE_REF: 2aafd6142b302d204f5af4d83c659328796235d3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the baseline commit is needed too
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: workout-cycle-apk
+
+      - name: Build the previous release
+        run: |
+          git worktree add "$RUNNER_TEMP/baseline" "$BASELINE_REF"
+          (cd "$RUNNER_TEMP/baseline/workout-tracker" && ./gradlew :app:assembleDebug)
+          cp "$RUNNER_TEMP/baseline/workout-tracker/app/build/outputs/apk/debug/app-debug.apk" baseline.apk
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Upgrade on an emulator and tap through
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          script: bash workout-tracker/scripts/smoke-test.sh baseline.apk workout-cycle.apk screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+
+  publish:
+    needs: emulator-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to replace the release that holds the APK
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: workout-cycle-apk
 
       - name: Publish phone download link
         env:
@@ -56,4 +119,4 @@ jobs:
           gh release create workout-cycle-latest workout-cycle.apk \
             --target "$GITHUB_SHA" \
             --title "Workout Cycle (latest build)" \
-            --notes "Built from ${GITHUB_SHA::7} on ${GITHUB_REF_NAME}. Open this page on your phone and tap workout-cycle.apk to install."
+            --notes "Built from ${GITHUB_SHA::7} on ${GITHUB_REF_NAME} and tested on an emulator. Open this page on your phone and tap workout-cycle.apk to install."

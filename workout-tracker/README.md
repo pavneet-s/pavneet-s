@@ -15,14 +15,17 @@ Built with Kotlin, Jetpack Compose and Material 3, and tuned for a modern phone 
 
 ## Installing on a phone without a computer
 
-Every push that changes `workout-tracker/` runs two GitHub Actions workflows:
+Every push that changes `workout-tracker/` runs the **Workout Cycle APK** GitHub Actions
+workflow in three stages:
 
-- **Workout Cycle APK** runs the unit tests, builds the app and publishes it at
-  https://github.com/pavneet-s/pavneet-s/releases/download/workout-cycle-latest/workout-cycle.apk.
-  Open that link on the phone to install or update.
-- **Workout Cycle smoke test** installs the previous release on an Android emulator and makes
-  progress. It then upgrades to the new build and checks that the progress survived, the
-  animations show and the picker saves a choice. Screenshots are kept as a run artifact.
+1. **Build:** runs the unit tests and builds the APK.
+2. **Emulator test:** installs the previous release on an Android emulator and makes progress.
+   It then upgrades to the new APK in place and checks the progress survived, the animations
+   show and the picker saves a choice (`scripts/smoke-test.sh`). Screenshots are kept as a run
+   artifact.
+3. **Publish:** only if both pass, replaces the APK at
+   https://github.com/pavneet-s/pavneet-s/releases/download/workout-cycle-latest/workout-cycle.apk.
+   Open that link on the phone to install or update.
 
 Debug builds are signed with the committed `app/debug.keystore`, so cloud and local builds
 can update each other without an uninstall, which would wipe saved progress.
