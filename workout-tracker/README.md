@@ -2,7 +2,7 @@
 
 An Android app for running a looping exercise rotation. It shows the current movement with one large **Done** button. Tapping it cues up the next movement, and after the last one it loops back to the first.
 
-Default rotation: **Push-ups → Back stretches → Shoulders → Triceps → Biceps → (repeat)**
+Default rotation, by muscle group: **Chest → Back → Shoulders → Triceps → Biceps → (repeat)**. Swipe the animation to pick which cable exercise you're doing for each.
 
 Built with Kotlin, Jetpack Compose and Material 3, and tuned for a modern phone like the Galaxy S24+.
 
@@ -10,13 +10,14 @@ Built with Kotlin, Jetpack Compose and Material 3, and tuned for a modern phone 
 
 | Screen | What it does |
 | --- | --- |
-| **Active workout** | Shows the current exercise in large type with a looping **cable-machine animation** of the movement and where to set the pulley. It also shows what's up next and progress through the round (segments, round number, sets done). The Done button sits in thumb reach with a haptic confirm. A snackbar offers **Undo** after each set, and the screen stays awake. |
-| **Weight and reps** | Steppers above the Done button, **prefilled from last time** ("Last: 35 lb × 12 reps · Monday"). Tap a value to type it. Units are lb, kg or stack plate number. Done logs the set. |
+| **Active workout** | Shows the current muscle group in large type with a looping **cable-machine animation** and where to set the pulley. **Swipe the animation** to switch between the group's cable exercises (chest press, flys, …); the choice is remembered. The figure **talks you through common mistakes** in a speech bubble, a new tip every few seconds (tap for the next), and the **weight stack lights up** to match the weight you've entered. It also shows what's up next and progress through the round. A snackbar offers **Undo** after each set, and the screen stays awake. |
+| **Weight and reps** | Steppers above the Done button, **prefilled from the last time you did that cable exercise** ("Last: 35 lb × 12 reps · Monday"), so a fly doesn't inherit your press weight. Tap a value to type it. Units are lb, kg or stack plate number. Done logs the set. |
 | **Rest timer** | After Done, a countdown with **+15 s** and **Skip rest** while the next exercise and its pulley height are already on screen. An exact alarm fires a **rest-over alert**, even with the screen off. |
 | **Machine setup** | Tap an exercise on the manage screen to rename it and save its **attachment** (rope, handle, bars, ankle strap), **pulley position** and **setup notes**. They show under the animation, e.g. "Rope · Notch 12 · Two steps back". |
-| **History** | Day streak, days this week and total sets. A 12-week **training calendar**, a **weight progress chart** per exercise, and recent workouts. |
+| **History** | Day streak, days this week and total sets. A 12-week **training calendar**, a **weight progress chart** per cable exercise ("Chest · Cable fly"), and recent workouts. |
 | **Lock screen and Galaxy Watch** | A workout notification shows the current exercise with a **Done** button, or the rest countdown with **Skip rest / +15 s**. Wear OS mirrors phone notifications and their buttons to a paired watch, so a Galaxy Watch can finish a set without a watch app. |
-| **Manage exercises** | Add exercises, switch one off to **skip** it without losing its slot, delete it, or **drag the handle to reorder**. Each exercise has a chip that opens a **picker with live previews** of every cable movement. TalkBack users get *Move up / Move down* actions instead of dragging. |
+| **Muscle groups** | Add muscle groups, switch one off to **skip** it without losing its slot, delete it, or **drag the handle to reorder**. Each has a chip that opens a **picker with live previews** of every cable exercise, grouped by muscle. TalkBack users get *Move up / Move down* actions instead of dragging. |
+| **Haptics** | Every kind of button has its own feel: a double thump for Done, rising and falling ticks for weight +/−, a crisp or soft tick for reps, a double tap to skip a rest, triple ticks for +15 s and more (`ui/Haptics.kt`). They use the motor's vibration primitives where supported and follow the phone's touch-vibration setting. |
 
 ## Installing on a phone without a computer
 
@@ -107,26 +108,34 @@ How the cyclical list behaves:
 | --- | --- | --- |
 | `cycles` | `id`, `name`, `current_exercise_id`, `sets_completed`, `rounds_completed` | One row today, seeded on first launch. |
 | `exercises` | `id`, `cycle_id` → `cycles.id`, `name`, `position`, `is_active`, `animation`, `attachment`, `pulley_position`, `setup_note` | `position` is rewritten on each save. `animation` is `NULL` (guess from the name), `OFF`, or a movement name; added in version 2. The setup columns were added in version 3. |
-| `set_logs` | `id`, `exercise_id` → `exercises.id` (set to `NULL` on delete), `exercise_name`, `weight`, `weight_unit`, `reps`, `completed_at` | One row per completed set. The name is copied in so history survives renames and deletes. Version 3. |
+| `set_logs` | `id`, `exercise_id` → `exercises.id` (set to `NULL` on delete), `exercise_name`, `weight`, `weight_unit`, `reps`, `completed_at`, `movement` | One row per completed set. The name is copied in so history survives renames and deletes. Version 3; `movement` (which cable exercise of the muscle group) was added in version 4. |
 | `settings` | `rest_enabled`, `rest_seconds`, `weight_unit`, `workout_notification`, `notification_prompted` | A single row, missing until something is changed; the defaults live in `AppSettings`. Version 3. |
 
-`cycles` also gained `rest_ends_at` in version 3. Each version bump has a hand-written
-migration in `WorkoutDatabase`, and the emulator job upgrades from real older releases to
-prove them.
+`cycles` also gained `rest_ends_at` in version 3. Version 4 credits older sets to the cable
+exercise their slot was showing and renames the old defaults "Push-ups" and "Back stretches"
+to "Chest" and "Back". Each version bump has a hand-written migration in `WorkoutDatabase`,
+and the emulator job upgrades from real older releases to prove them.
 
 The repository observes a `@Transaction` query that returns `CycleWithExercises` (`@Embedded` cycle plus a `@Relation` to its exercises). A change to both tables is therefore never seen half-applied. Keying exercises by `cycle_id` also leaves room for several routines later, such as "Push day" and "Pull day".
 
 ## Cable machine animations
 
-Each exercise shows a looping stick-figure demo on a cable tower. The weight stack rises as
-the handle moves away from the pulley, and there's a short squeeze at the top of each rep.
+Each muscle group shows a looping stick-figure demo on a cable tower. The pinned plates of
+the weight stack (one per 10 lb or 5 kg, plus a half-plate add-on, or the pin number in
+"Plate" mode) light up and rise as the handle moves away from the pulley, and there's a short
+squeeze at the top of each rep.
 
-- **Movements:** chest press, row, straight-arm pulldown, face pull, lateral raise (front
-  view), triceps pushdown, overhead triceps extension and curl.
-- **Choosing one:** an exercise's animation is guessed from its name. "Push-ups" maps to the
-  chest press, "Back" to the row, "Shoulders" to the lateral raise, and so on; see
-  `CableMovement.guessFor`. A different movement, or none, can be picked on the manage screen.
-  The choice is stored in `exercises.animation`, added by the version 1 to 2 database migration.
+- **Exercises, by muscle group:** chest (press, single-arm fly, high-to-low fly, low-to-high
+  fly), back (row, kneeling lat pulldown, straight-arm pulldown), shoulders (lateral raise,
+  front raise, face pull), triceps (pushdown, overhead extension, kickback), biceps (curl,
+  high cable curl, behind-the-back curl), legs (glute kickback, pull-through) and core
+  (kneeling crunch, woodchopper). Flys, the lateral raise, the high curl and the woodchopper
+  are drawn from the front; the rest from the side.
+- **Choosing one:** swipe the animation on the workout screen, or use the picker on the manage
+  screen. Until then it's guessed from the name: "Chest" starts on the chest press, "Back" on
+  the row and so on (`CableMovement.guessFor`). The choice is stored in `exercises.animation`.
+- **Form tips:** each exercise has five common mistakes (`res/values/tips.xml`) that the
+  figure says in a speech bubble above its head, one every six seconds.
 - **How it's built:** the poses (`ui/cable/CablePoses.kt`) and drawing (`ui/cable/CableDrawing.kt`)
   are plain Kotlin. They use inverse kinematics for the multi-joint presses and rows, and
   produce lines, circles and boxes in a fixed 100 × 86 scene. `CableMachineAnimation` draws
@@ -166,7 +175,7 @@ button, the notification's Done button (on the phone or a paired watch) or the r
 - **Edge-to-edge** layout, with the Done button padded above the gesture bar.
 - **Material You** colours from the wallpaper (Android 12+), with a fallback palette.
 - **Predictive back** (`enableOnBackInvokedCallback`) for the One UI back gesture animation.
-- **Haptics** using the Compose `Confirm` / `Segment` feedback types.
+- **Haptics** with a distinct pattern per button (see the Haptics row above).
 - **Screen stays on** during the workout, since the phone is usually on the floor mid-set.
 
 ## Project layout
@@ -179,17 +188,18 @@ app/src/main/java/com/pavneet/workoutcycle/
 │   ├── WorkoutCycle.kt         Exercise + WorkoutCycle: all cycle rules, rest state
 │   ├── Training.kt             weights, sets, machine setup, settings
 │   ├── WorkoutHistory.kt       streaks, sessions and progress from the set log
-│   └── CableMovement.kt        cable movements, pulley heights, name guessing
+│   └── CableMovement.kt        muscle groups, cable exercises, pulley heights, name guessing
 ├── session/                    WorkoutController, rest alarm, notifications (watch Done)
 ├── data/
 │   ├── WorkoutRepository.kt    load → transform → save, Flow<WorkoutCycle>
 │   └── local/                  Room entities, DAO, database (+ default seed)
 └── ui/
     ├── WorkoutNavHost.kt       type-safe Navigation Compose routes
-    ├── cable/                  pose engine, drawing and the Compose animation
+    ├── Haptics.kt              a vibration pattern for each kind of button
+    ├── cable/                  pose engine, drawing, the Compose animation, labels and tips
     ├── theme/Theme.kt
-    ├── workout/                Active workout screen + ViewModel
-    ├── manage/                 Manage exercises, exercise editor, animation picker
+    ├── workout/                Active workout screen, exercise pager with the tip bubble, ViewModel
+    ├── manage/                 Muscle groups, editor, cable exercise picker
     ├── history/                History screen, training calendar, progress charts
     └── settings/               Settings screen
 ```

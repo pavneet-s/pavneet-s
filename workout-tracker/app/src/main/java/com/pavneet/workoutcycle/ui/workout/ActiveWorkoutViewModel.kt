@@ -8,10 +8,13 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pavneet.workoutcycle.WorkoutCycleApp
 import com.pavneet.workoutcycle.data.CompletedSet
 import com.pavneet.workoutcycle.data.WorkoutRepository
+import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.AppSettings
+import com.pavneet.workoutcycle.domain.CableMovement
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.LoggedSet
 import com.pavneet.workoutcycle.domain.SetEntry
+import com.pavneet.workoutcycle.domain.SetKey
 import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.session.WorkoutController
 import kotlinx.coroutines.channels.Channel
@@ -40,18 +43,23 @@ sealed interface ActiveWorkoutUiState {
         val roundPosition: Int,
         val setsCompleted: Int,
         val roundsCompleted: Int,
-        /** What Done will log for [current]: the last set's values unless edited. */
+        /** What Done will log for [current] as its chosen cable exercise: the last set's values unless edited. */
         val entry: SetEntry,
         val unit: WeightUnit,
-        /** The most recent set of [current], for the "Last:" hint. */
+        /** The most recent set of [current] as its chosen cable exercise, for the "Last:" hint. */
         val lastSet: LoggedSet?,
+        /** What each of [current]'s cable exercises would log, so every swipe page shows its own weight. */
+        val pageEntries: Map<CableMovement, SetEntry>,
         /** End of the current rest (epoch ms). The screen compares it with the clock. */
         val restEndsAt: Long?,
         val restSeconds: Int,
-    ) : ActiveWorkoutUiState
+    ) : ActiveWorkoutUiState {
+        /** Identifies what Done logs: [current] as its chosen cable exercise. */
+        val key: SetKey get() = SetKey(current.id, current.movement)
+    }
 }
 
-/** One-off event for the "Push-ups done · Undo" snackbar. */
+/** One-off event for the "Chest done · Undo" snackbar. */
 data class CompletedSetEvent(val exerciseName: String)
 
 class ActiveWorkoutViewModel(
@@ -59,8 +67,8 @@ class ActiveWorkoutViewModel(
     private val controller: WorkoutController,
 ) : ViewModel() {
 
-    /** Weight and reps edited on screen but not logged yet, per exercise. */
-    private val drafts = MutableStateFlow<Map<Long, SetEntry>>(emptyMap())
+    /** Weight and reps edited on screen but not logged yet, per exercise and cable exercise. */
+    private val drafts = MutableStateFlow<Map<SetKey, SetEntry>>(emptyMap())
 
     val uiState: StateFlow<ActiveWorkoutUiState> = combine(
         repository.cycle,
@@ -69,9 +77,8 @@ class ActiveWorkoutViewModel(
         drafts,
     ) { cycle, settings, lastSets, drafts ->
         val exercise = cycle.current ?: return@combine ActiveWorkoutUiState.Empty
-        val lastSet = lastSets[exercise.id]
-        // Only carry the weight over if it was logged in the unit in use now.
-        val prefill = SetEntry(weight = lastSet?.weight?.takeIf { lastSet?.unit == settings.weightUnit }, reps = lastSet?.reps)
+        fun entryFor(key: SetKey): SetEntry = drafts[key] ?: prefill(lastSets[key], settings.weightUnit)
+        val key = SetKey(exercise.id, exercise.movement)
         ActiveWorkoutUiState.Active(
             current = exercise,
             upNext = checkNotNull(cycle.upNext),
@@ -79,9 +86,10 @@ class ActiveWorkoutViewModel(
             roundPosition = cycle.roundPosition,
             setsCompleted = cycle.setsCompleted,
             roundsCompleted = cycle.roundsCompleted,
-            entry = drafts[exercise.id] ?: prefill,
+            entry = entryFor(key),
             unit = settings.weightUnit,
-            lastSet = lastSet,
+            lastSet = lastSets[key],
+            pageEntries = exercise.movementChoices.associateWith { entryFor(SetKey(exercise.id, it)) },
             restEndsAt = cycle.restEndsAt,
             restSeconds = settings.restSeconds,
         )
@@ -99,18 +107,23 @@ class ActiveWorkoutViewModel(
     /** Keeps the workout notification (and the watch's Done button) up while training. */
     fun onScreenShown() = controller.markActive()
 
-    fun onEntryChange(exerciseId: Long, entry: SetEntry) {
-        drafts.update { it + (exerciseId to entry) }
+    fun onEntryChange(key: SetKey, entry: SetEntry) {
+        drafts.update { it + (key to entry) }
     }
 
-    /** [exerciseId] is the exercise the user saw on screen, which makes repeat taps harmless. */
-    fun onSetCompleted(exerciseId: Long, entry: SetEntry) {
+    /** [key] is what the user saw on screen, which makes repeat taps harmless. */
+    fun onSetCompleted(key: SetKey, entry: SetEntry) {
         viewModelScope.launch {
-            val completed = controller.completeSet(exerciseId, entry) ?: return@launch
-            drafts.update { it - exerciseId }
+            val completed = controller.completeSet(key.exerciseId, entry) ?: return@launch
+            drafts.update { it - key }
             undoable = completed
             completions.send(CompletedSetEvent(completed.exerciseName))
         }
+    }
+
+    /** Swiped to another of the muscle group's cable exercises: remember it for next time too. */
+    fun onMovementSelected(exerciseId: Long, movement: CableMovement) {
+        viewModelScope.launch { repository.setExerciseAnimation(exerciseId, AnimationSetting.Fixed(movement)) }
     }
 
     fun onUndo() {
@@ -137,6 +150,10 @@ class ActiveWorkoutViewModel(
         controller.markActive()
         viewModelScope.launch { repository.updateSettings { it.copy(notificationPrompted = true) } }
     }
+
+    // Only carry the weight over if it was logged in the unit in use now.
+    private fun prefill(last: LoggedSet?, unit: WeightUnit) =
+        SetEntry(weight = last?.weight?.takeIf { last?.unit == unit }, reps = last?.reps)
 
     companion object {
         val Factory = viewModelFactory {

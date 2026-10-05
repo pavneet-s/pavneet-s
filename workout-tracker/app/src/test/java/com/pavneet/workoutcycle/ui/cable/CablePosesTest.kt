@@ -16,25 +16,47 @@ class CablePosesTest {
         }
     }
 
-    private fun assertLength(expected: Float, from: ScenePoint, to: ScenePoint, what: String) =
-        assertEquals(what, expected, (to - from).length, 0.05f)
+    /**
+     * From the side every limb moves in the picture, so it keeps its length. From the front an
+     * arm can swing toward us and look shorter, but never longer or collapsed to a dot.
+     */
+    private fun assertLength(expected: Float, from: ScenePoint, to: ScenePoint, frontView: Boolean, what: String) {
+        val length = (to - from).length
+        if (frontView) {
+            assertTrue("$what is $length, longer than $expected", length <= expected + 0.05f)
+            assertTrue("$what is $length, too foreshortened", length >= expected * 0.25f)
+        } else {
+            assertEquals(what, expected, length, 0.05f)
+        }
+    }
 
     @Test
     fun `limbs keep their length`() = forEachFrame { movement, t, frame ->
         for ((name, arm) in listOf("near arm" to frame.nearArm, "far arm" to frame.farArm)) {
-            assertLength(UPPER_ARM, arm.root, arm.joint, "$movement t=$t $name upper")
-            assertLength(FOREARM, arm.joint, arm.end, "$movement t=$t $name forearm")
+            assertLength(UPPER_ARM, arm.root, arm.joint, frame.frontView, "$movement t=$t $name upper")
+            assertLength(FOREARM, arm.joint, arm.end, frame.frontView, "$movement t=$t $name forearm")
         }
         for ((name, leg) in listOf("near leg" to frame.nearLeg, "far leg" to frame.farLeg)) {
-            assertLength(THIGH, leg.root, leg.joint, "$movement t=$t $name thigh")
-            assertLength(SHIN, leg.joint, leg.end, "$movement t=$t $name shin")
+            assertLength(THIGH, leg.root, leg.joint, frontView = false, "$movement t=$t $name thigh")
+            assertLength(SHIN, leg.joint, leg.end, frontView = false, "$movement t=$t $name shin")
         }
     }
 
     @Test
     fun `feet stay planted on the floor`() = forEachFrame { movement, t, frame ->
-        assertEquals("$movement t=$t near ankle", ANKLE_Y, frame.nearLeg.end.y, 0.05f)
+        // The kickback's near leg is the one doing the work.
+        if (movement != CableMovement.GLUTE_KICKBACK) {
+            assertEquals("$movement t=$t near ankle", ANKLE_Y, frame.nearLeg.end.y, 0.05f)
+        }
         assertEquals("$movement t=$t far ankle", ANKLE_Y, frame.farLeg.end.y, 0.05f)
+    }
+
+    @Test
+    fun `a swinging leg stays above the floor`() {
+        for (t in phases) {
+            val frame = CablePoses.frame(CableMovement.GLUTE_KICKBACK, t)
+            assertTrue("t=$t", frame.nearLeg.end.y <= ANKLE_Y + 0.05f && frame.nearToe.y < CableScene.FLOOR_Y)
+        }
     }
 
     @Test

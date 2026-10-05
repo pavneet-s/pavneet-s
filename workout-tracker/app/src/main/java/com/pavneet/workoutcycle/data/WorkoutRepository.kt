@@ -1,6 +1,7 @@
 package com.pavneet.workoutcycle.data
 
 import androidx.room.withTransaction
+import com.pavneet.workoutcycle.data.local.AnimationColumn
 import com.pavneet.workoutcycle.data.local.CycleWithExercises
 import com.pavneet.workoutcycle.data.local.ExerciseEntity
 import com.pavneet.workoutcycle.data.local.SetLogEntity
@@ -14,6 +15,7 @@ import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.LoggedSet
 import com.pavneet.workoutcycle.domain.MachineSetup
 import com.pavneet.workoutcycle.domain.SetEntry
+import com.pavneet.workoutcycle.domain.SetKey
 import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 import kotlinx.coroutines.flow.Flow
@@ -49,9 +51,11 @@ class WorkoutRepository(
     /** Every logged set, oldest first. */
     val history: Flow<List<LoggedSet>> = dao.observeLogs().map { logs -> logs.map { it.toDomain() } }
 
-    /** The most recent set of each exercise, by exercise id. */
-    val lastSets: Flow<Map<Long, LoggedSet>> = dao.observeLatestLogs().map { logs ->
-        logs.mapNotNull { log -> log.exerciseId?.let { id -> id to log.toDomain() } }.toMap()
+    /** The most recent set of each exercise, per cable exercise done for it. */
+    val lastSets: Flow<Map<SetKey, LoggedSet>> = dao.observeLatestLogs().map { logs ->
+        logs.map { it.toDomain() }
+            .mapNotNull { set -> set.exerciseId?.let { id -> SetKey(id, set.movement) to set } }
+            .toMap()
     }
 
     suspend fun currentCycle(): WorkoutCycle = load()
@@ -59,9 +63,9 @@ class WorkoutRepository(
     suspend fun currentSettings(): AppSettings = dao.getSettings()?.toDomain() ?: AppSettings()
 
     /**
-     * Logs a set of [exerciseId], advances to the next movement and starts a rest if enabled.
-     * A null [entry] repeats the exercise's last weight and reps, which is what the watch's
-     * Done button uses.
+     * Logs a set of [exerciseId] as its current cable exercise, advances to the next movement
+     * and starts a rest if enabled. A null [entry] repeats that exercise's last weight and
+     * reps, which is what the watch's Done button uses.
      *
      * @return what to undo, or `null` if [exerciseId] was no longer current, e.g. the second
      * tap of a double tap.
@@ -74,7 +78,8 @@ class WorkoutRepository(
             if (advanced === before) return@withTransaction null
 
             val settings = currentSettings()
-            val values = entry ?: lastEntry(exercise.id, settings.weightUnit)
+            val movement = exercise.movement
+            val values = entry ?: lastEntry(SetKey(exercise.id, movement), settings.weightUnit)
             val logId = dao.insertLog(
                 SetLogEntity(
                     exerciseId = exercise.id,
@@ -83,6 +88,7 @@ class WorkoutRepository(
                     weightUnit = values.weight?.let { settings.weightUnit.name },
                     reps = values.reps,
                     completedAt = now,
+                    movement = movement?.name,
                 ),
             )
             val after = if (settings.restEnabled) {
@@ -94,9 +100,9 @@ class WorkoutRepository(
             CompletedSet(before, logId, exercise.name, after.restEndsAt)
         }
 
-    /** The values to prefill for an exercise: its last reps, and its last weight if it was in [unit]. */
-    suspend fun lastEntry(exerciseId: Long, unit: WeightUnit): SetEntry {
-        val last = dao.lastLogFor(exerciseId) ?: return SetEntry()
+    /** The values to prefill: the last reps of [key], and its last weight if it was in [unit]. */
+    suspend fun lastEntry(key: SetKey, unit: WeightUnit): SetEntry {
+        val last = dao.lastLogFor(key.exerciseId, key.movement?.name) ?: return SetEntry()
         return SetEntry(weight = last.weight.takeIf { last.weightUnit == unit.name }, reps = last.reps)
     }
 
@@ -193,7 +199,7 @@ class WorkoutRepository(
                         name = exercise.name,
                         position = position,
                         isActive = exercise.isActive,
-                        animation = exercise.animation.encode(),
+                        animation = AnimationColumn.encode(exercise.animation),
                         attachment = exercise.setup.attachment?.name,
                         pulleyPosition = exercise.setup.pulleyPosition.trim().ifEmpty { null },
                         setupNote = exercise.setup.note.trim().ifEmpty { null },
@@ -218,7 +224,7 @@ class WorkoutRepository(
                     id = it.id,
                     name = it.name,
                     isActive = it.isActive,
-                    animation = decodeAnimation(it.animation),
+                    animation = AnimationColumn.decode(it.animation),
                     setup = MachineSetup(
                         attachment = Attachment.entries.firstOrNull { attachment -> attachment.name == it.attachment },
                         pulleyPosition = it.pulleyPosition.orEmpty(),
@@ -240,6 +246,7 @@ class WorkoutRepository(
         unit = WeightUnit.entries.firstOrNull { it.name == weightUnit },
         reps = reps,
         completedAt = completedAt,
+        movement = CableMovement.entries.firstOrNull { it.name == movement },
     )
 
     private fun SettingsEntity.toDomain() = AppSettings(
@@ -258,23 +265,7 @@ class WorkoutRepository(
         notificationPrompted = notificationPrompted,
     )
 
-    private fun AnimationSetting.encode(): String? = when (this) {
-        AnimationSetting.Auto -> null
-        AnimationSetting.Off -> ANIMATION_OFF
-        is AnimationSetting.Fixed -> movement.name
-    }
-
-    // An unknown name (e.g. a movement removed in a later version) falls back to guessing.
-    private fun decodeAnimation(value: String?): AnimationSetting = when (value) {
-        null -> AnimationSetting.Auto
-        ANIMATION_OFF -> AnimationSetting.Off
-        else -> CableMovement.entries.firstOrNull { it.name == value }
-            ?.let { AnimationSetting.Fixed(it) }
-            ?: AnimationSetting.Auto
-    }
-
     private companion object {
-        const val ANIMATION_OFF = "OFF"
         const val ALARM_TOLERANCE_MS = 2_000L
     }
 }

@@ -30,6 +30,32 @@ class TrainingTest {
     }
 
     @Test
+    fun `the weight stack lifts a plate per 10 lb or 5 kg, with a half plate in between`() {
+        assertEquals(StackLoad.EMPTY, StackLoad.of(null, WeightUnit.LB))
+        assertEquals(StackLoad(0, halfPlate = true), StackLoad.of(5.0, WeightUnit.LB))
+        assertEquals(StackLoad(1), StackLoad.of(10.0, WeightUnit.LB))
+        assertEquals(StackLoad(1, halfPlate = true), StackLoad.of(15.0, WeightUnit.LB))
+        assertEquals(StackLoad(4, halfPlate = true), StackLoad.of(22.5, WeightUnit.KG))
+        assertEquals(StackLoad(7), StackLoad.of(7.0, WeightUnit.PLATE))
+        assertEquals(StackLoad(StackLoad.STACK_PLATES, halfPlate = true), StackLoad.of(500.0, WeightUnit.LB))
+    }
+
+    @Test
+    fun `every tap of plus lifts more of the stack until it is all lifted`() {
+        for (unit in WeightUnit.entries) {
+            var weight: Double? = null
+            var lifted = 0
+            repeat(if (unit == WeightUnit.PLATE) StackLoad.STACK_PLATES else StackLoad.STACK_PLATES * 2) {
+                weight = unit.increase(weight)
+                val load = StackLoad.of(weight, unit)
+                val halves = load.plates * 2 + if (load.halfPlate) 1 else 0
+                assertTrue("$unit at $weight", halves > lifted)
+                lifted = halves
+            }
+        }
+    }
+
+    @Test
     fun `reps start at a typical set and never go below one`() {
         assertEquals(10, SetEntry().increaseReps().reps)
         assertEquals(13, SetEntry(reps = 12).increaseReps().reps)

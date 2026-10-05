@@ -53,11 +53,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # Releases that may be on a phone, oldest first: the first one (database version 1) and the
-      # cable-animation one (version 2). The new build is installed over each in turn.
+      # Releases that may be on a phone, oldest first: the first one (database version 1), the
+      # cable-animation one (version 2) and the set-logging one (version 3). The new build is
+      # installed over each in turn.
       BASELINE_REFS: >-
         2aafd6142b302d204f5af4d83c659328796235d3
         75de3f06c8a42701650eb8bad417e4871697c486
+        573765970d89824466b8a5eb3af5a4fe704bdc68
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,7 +99,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: bash workout-tracker/scripts/smoke-test.sh workout-cycle.apk screenshots baseline-1.apk baseline-2.apk
+          script: bash workout-tracker/scripts/smoke-test.sh workout-cycle.apk screenshots baseline-1.apk baseline-2.apk baseline-3.apk
 
       - name: Upload screenshots
         if: always()

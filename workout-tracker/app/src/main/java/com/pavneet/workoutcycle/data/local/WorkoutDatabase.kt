@@ -6,11 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.pavneet.workoutcycle.domain.CableMovement
+import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 
 @Database(
     entities = [CycleEntity::class, ExerciseEntity::class, SetLogEntity::class, SettingsEntity::class],
-    version = 3,
+    version = 4,
 )
 abstract class WorkoutDatabase : RoomDatabase() {
 
@@ -22,7 +24,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
         fun build(context: Context): WorkoutDatabase =
             Room.databaseBuilder(context, WorkoutDatabase::class.java, "workout-cycle.db")
                 .addCallback(SeedDefaultCycle)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
         /** v2 adds the per-exercise animation choice; existing rows keep guessing from their name. */
@@ -61,6 +63,49 @@ abstract class WorkoutDatabase : RoomDatabase() {
                         "workout_notification INTEGER NOT NULL, " +
                         "notification_prompted INTEGER NOT NULL)",
                 )
+            }
+        }
+
+        /** The first release's default exercises, renamed in v4 to the muscle groups they train. */
+        private val RENAMED_DEFAULTS = mapOf("Push-ups" to "Chest", "Back stretches" to "Back")
+
+        /**
+         * v4 records which cable exercise each set was, so a muscle group's exercises keep their
+         * own weights. Earlier sets are credited to the exercise their slot was showing. The old
+         * default names become the muscle groups they train, in the log too.
+         */
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE set_logs ADD COLUMN movement TEXT")
+                db.query("SELECT id, name, animation FROM exercises").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val exercise = Exercise(
+                            id = cursor.getLong(0),
+                            name = cursor.getString(1),
+                            animation = AnimationColumn.decode(if (cursor.isNull(2)) null else cursor.getString(2)),
+                        )
+                        val movement = exercise.movement ?: continue
+                        db.execSQL(
+                            "UPDATE set_logs SET movement = ? WHERE exercise_id = ?",
+                            arrayOf<Any?>(movement.name, exercise.id),
+                        )
+                    }
+                }
+                // Sets of deleted exercises only have their name to go on.
+                db.query("SELECT DISTINCT exercise_name FROM set_logs WHERE exercise_id IS NULL").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(0)
+                        val movement = CableMovement.guessFor(name) ?: continue
+                        db.execSQL(
+                            "UPDATE set_logs SET movement = ? WHERE exercise_id IS NULL AND exercise_name = ?",
+                            arrayOf<Any?>(movement.name, name),
+                        )
+                    }
+                }
+                for ((old, new) in RENAMED_DEFAULTS) {
+                    db.execSQL("UPDATE exercises SET name = ? WHERE name = ?", arrayOf<Any?>(new, old))
+                    db.execSQL("UPDATE set_logs SET exercise_name = ? WHERE exercise_name = ?", arrayOf<Any?>(new, old))
+                }
             }
         }
     }

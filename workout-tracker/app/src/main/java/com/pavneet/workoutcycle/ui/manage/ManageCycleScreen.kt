@@ -70,7 +70,9 @@ import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.MachineSetup
 import com.pavneet.workoutcycle.domain.WorkoutCycle
+import com.pavneet.workoutcycle.ui.Haptic
 import com.pavneet.workoutcycle.ui.cable.labelRes
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import com.pavneet.workoutcycle.ui.setupSummary
 import com.pavneet.workoutcycle.ui.theme.WorkoutCycleTheme
 import sh.calvin.reorderable.ReorderableItem
@@ -109,6 +111,7 @@ fun ManageCycleScreen(
 ) {
     var animationPickerFor by rememberSaveable { mutableStateOf<Long?>(null) }
     var editorFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    val haptics = rememberHaptics()
 
     Scaffold(
         modifier = modifier,
@@ -116,7 +119,7 @@ fun ManageCycleScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.manage_cycle)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
@@ -145,11 +148,23 @@ fun ManageCycleScreen(
                 ReorderableExerciseList(
                     exercises = uiState.exercises,
                     currentExerciseId = uiState.currentExerciseId,
-                    onRemove = onRemoveExercise,
-                    onActiveChange = onExerciseActiveChange,
+                    onRemove = { exerciseId ->
+                        haptics.perform(Haptic.DELETE)
+                        onRemoveExercise(exerciseId)
+                    },
+                    onActiveChange = { exerciseId, active ->
+                        haptics.perform(Haptic.toggle(active))
+                        onExerciseActiveChange(exerciseId, active)
+                    },
                     onReorder = onReorder,
-                    onAnimationClick = { exerciseId -> animationPickerFor = exerciseId },
-                    onEditClick = { exerciseId -> editorFor = exerciseId },
+                    onAnimationClick = { exerciseId ->
+                        haptics.perform(Haptic.SELECT)
+                        animationPickerFor = exerciseId
+                    },
+                    onEditClick = { exerciseId ->
+                        haptics.perform(Haptic.NAVIGATE)
+                        editorFor = exerciseId
+                    },
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -164,6 +179,7 @@ fun ManageCycleScreen(
     uiState.exercises.firstOrNull { it.id == animationPickerFor }?.let { exercise ->
         AnimationPickerSheet(
             exerciseName = exercise.name,
+            group = exercise.muscleGroup,
             selected = exercise.movement,
             onSelect = { animation -> onExerciseAnimationChange(exercise.id, animation) },
             onDismiss = { animationPickerFor = null },
@@ -182,10 +198,12 @@ fun ManageCycleScreen(
 @Composable
 private fun AddExerciseField(onAdd: (String) -> Unit, modifier: Modifier = Modifier) {
     var name by rememberSaveable { mutableStateOf("") }
+    val haptics = rememberHaptics()
 
-    // The keyboard stays open after adding, so several exercises can be entered in a row.
+    // The keyboard stays open after adding, so several muscle groups can be entered in a row.
     fun submit() {
         if (name.isBlank()) return
+        haptics.perform(Haptic.SAVE)
         onAdd(name)
         name = ""
     }

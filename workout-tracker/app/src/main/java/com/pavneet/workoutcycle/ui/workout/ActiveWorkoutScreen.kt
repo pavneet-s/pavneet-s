@@ -11,7 +11,6 @@ import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -77,9 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -106,11 +103,13 @@ import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.LoggedSet
 import com.pavneet.workoutcycle.domain.MachineSetup
 import com.pavneet.workoutcycle.domain.SetEntry
+import com.pavneet.workoutcycle.domain.SetKey
+import com.pavneet.workoutcycle.domain.StackLoad
 import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 import com.pavneet.workoutcycle.domain.formatWeight
-import com.pavneet.workoutcycle.ui.cable.CableMachineAnimation
-import com.pavneet.workoutcycle.ui.cable.labelRes
+import com.pavneet.workoutcycle.ui.Haptic
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import com.pavneet.workoutcycle.ui.unitLabelRes
 import com.pavneet.workoutcycle.ui.relativeDay
 import com.pavneet.workoutcycle.ui.setSummary
@@ -131,6 +130,7 @@ fun ActiveWorkoutRoute(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val haptics = rememberHaptics()
 
     LaunchedEffect(viewModel, snackbarHostState) {
         // collectLatest: a newer completion replaces the visible snackbar instead of queueing behind it.
@@ -140,7 +140,10 @@ fun ActiveWorkoutRoute(
                 actionLabel = context.getString(R.string.undo),
                 duration = SnackbarDuration.Short,
             )
-            if (result == SnackbarResult.ActionPerformed) viewModel.onUndo()
+            if (result == SnackbarResult.ActionPerformed) {
+                haptics.perform(Haptic.UNDO)
+                viewModel.onUndo()
+            }
         }
     }
     LaunchedEffect(viewModel) { viewModel.onScreenShown() }
@@ -153,6 +156,7 @@ fun ActiveWorkoutRoute(
         snackbarHostState = snackbarHostState,
         onEntryChange = viewModel::onEntryChange,
         onSetCompleted = viewModel::onSetCompleted,
+        onMovementSelected = viewModel::onMovementSelected,
         onSkipRest = viewModel::onSkipRest,
         onExtendRest = viewModel::onExtendRest,
         onRestart = viewModel::onRestart,
@@ -166,8 +170,9 @@ fun ActiveWorkoutRoute(
 fun ActiveWorkoutScreen(
     uiState: ActiveWorkoutUiState,
     snackbarHostState: SnackbarHostState,
-    onEntryChange: (exerciseId: Long, entry: SetEntry) -> Unit,
-    onSetCompleted: (exerciseId: Long, entry: SetEntry) -> Unit,
+    onEntryChange: (key: SetKey, entry: SetEntry) -> Unit,
+    onSetCompleted: (key: SetKey, entry: SetEntry) -> Unit,
+    onMovementSelected: (exerciseId: Long, movement: CableMovement) -> Unit,
     onSkipRest: () -> Unit,
     onExtendRest: () -> Unit,
     onRestart: () -> Unit,
@@ -193,9 +198,9 @@ fun ActiveWorkoutScreen(
             if (uiState is ActiveWorkoutUiState.Active) {
                 WorkoutControls(
                     state = uiState,
-                    onEntryChange = { entry -> onEntryChange(uiState.current.id, entry) },
+                    onEntryChange = { entry -> onEntryChange(uiState.key, entry) },
                     // Sends the id that is on screen; a second tap before the UI updates is ignored downstream.
-                    onDone = { onSetCompleted(uiState.current.id, uiState.entry) },
+                    onDone = { onSetCompleted(uiState.key, uiState.entry) },
                     onSkipRest = onSkipRest,
                     onExtendRest = onExtendRest,
                     modifier = Modifier
@@ -214,7 +219,11 @@ fun ActiveWorkoutScreen(
                 CircularProgressIndicator()
             }
             ActiveWorkoutUiState.Empty -> EmptyCycle(onManageCycle = onManageCycle, modifier = contentModifier)
-            is ActiveWorkoutUiState.Active -> ActiveWorkoutContent(state = uiState, modifier = contentModifier)
+            is ActiveWorkoutUiState.Active -> ActiveWorkoutContent(
+                state = uiState,
+                onMovementSelected = onMovementSelected,
+                modifier = contentModifier,
+            )
         }
     }
 }
@@ -229,18 +238,19 @@ private fun WorkoutTopBar(
     onOpenSettings: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     TopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
         actions = {
-            IconButton(onClick = onOpenHistory) {
+            IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); onOpenHistory() }) {
                 Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.history))
             }
-            IconButton(onClick = onManageCycle) {
-                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.manage_cycle))
+            IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); onManageCycle() }) {
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.manage_cycle_action))
             }
             // Restart wipes the counters, so it sits behind a menu rather than one tap away.
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); menuExpanded = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
@@ -248,6 +258,7 @@ private fun WorkoutTopBar(
                         text = { Text(stringResource(R.string.settings)) },
                         leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
                         onClick = {
+                            haptics.perform(Haptic.NAVIGATE)
                             menuExpanded = false
                             onOpenSettings()
                         },
@@ -257,6 +268,7 @@ private fun WorkoutTopBar(
                         leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
                         enabled = canRestart,
                         onClick = {
+                            haptics.perform(Haptic.DELETE)
                             menuExpanded = false
                             onRestart()
                         },
@@ -267,8 +279,15 @@ private fun WorkoutTopBar(
     )
 }
 
+/** What the exercise pager shows; kept together so a page fading out keeps its own weights. */
+private data class PagerContent(val exercise: Exercise, val entries: Map<CableMovement, SetEntry>, val unit: WeightUnit)
+
 @Composable
-private fun ActiveWorkoutContent(state: ActiveWorkoutUiState.Active, modifier: Modifier = Modifier) {
+private fun ActiveWorkoutContent(
+    state: ActiveWorkoutUiState.Active,
+    onMovementSelected: (exerciseId: Long, movement: CableMovement) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val movement = state.current.movement
     val setup = setupSummary(state.current.setup)
     Column(
@@ -279,13 +298,28 @@ private fun ActiveWorkoutContent(state: ActiveWorkoutUiState.Active, modifier: M
         // The demo takes the free space; without one the name sits in the middle instead.
         if (movement != null) {
             Spacer(Modifier.height(12.dp))
-            CableDemo(
-                movement = movement,
-                setup = setup,
+            AnimatedContent(
+                targetState = PagerContent(state.current, state.pageEntries, state.unit),
+                // A new muscle group fades in; swiping within one doesn't.
+                contentKey = { it.exercise.id },
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "exercisePager",
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-            )
+            ) { content ->
+                val shown = content.exercise.movement
+                if (shown != null) {
+                    CableExercisePager(
+                        choices = content.exercise.movementChoices,
+                        selected = shown,
+                        loadFor = { StackLoad.of(content.entries[it]?.weight, content.unit) },
+                        onSelect = { onMovementSelected(content.exercise.id, it) },
+                        setup = setupSummary(content.exercise.setup),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
         } else {
             Spacer(Modifier.weight(1f))
@@ -348,41 +382,8 @@ private fun RoundProgress(state: ActiveWorkoutUiState.Active, modifier: Modifier
     }
 }
 
-/** The looping cable-machine demo, which movement it is, the pulley height and your saved setup. */
 @Composable
-private fun CableDemo(movement: CableMovement, setup: String?, modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Crossfade(
-            targetState = movement,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            label = "cableDemo",
-        ) { shown ->
-            CableMachineAnimation(
-                movement = shown,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(MaterialTheme.shapes.extraLarge),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(
-                R.string.cable_caption,
-                stringResource(movement.labelRes),
-                stringResource(movement.pulley.labelRes),
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (setup != null) SetupLine(setup)
-    }
-}
-
-@Composable
-private fun SetupLine(setup: String) {
+internal fun SetupLine(setup: String) {
     Text(
         text = setup,
         style = MaterialTheme.typography.bodyMedium,
@@ -515,6 +516,8 @@ private fun SetPanel(
                 onEdit = { editing = EditField.WEIGHT },
                 decreaseDescription = stringResource(R.string.decrease_weight),
                 increaseDescription = stringResource(R.string.increase_weight),
+                decreaseHaptic = Haptic.WEIGHT_DOWN,
+                increaseHaptic = Haptic.WEIGHT_UP,
                 modifier = Modifier.weight(1f),
             )
             Stepper(
@@ -525,6 +528,8 @@ private fun SetPanel(
                 onEdit = { editing = EditField.REPS },
                 decreaseDescription = stringResource(R.string.decrease_reps),
                 increaseDescription = stringResource(R.string.increase_reps),
+                decreaseHaptic = Haptic.REPS_DOWN,
+                increaseHaptic = Haptic.REPS_UP,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -580,8 +585,11 @@ private fun Stepper(
     onEdit: () -> Unit,
     decreaseDescription: String,
     increaseDescription: String,
+    decreaseHaptic: Haptic,
+    increaseHaptic: Haptic,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberHaptics()
     Column(modifier) {
         Text(
             text = label,
@@ -590,7 +598,14 @@ private fun Stepper(
         )
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconButton(onClick = onDecrease, enabled = value != null, modifier = Modifier.size(48.dp)) {
+            FilledTonalIconButton(
+                onClick = {
+                    haptics.perform(decreaseHaptic)
+                    onDecrease()
+                },
+                enabled = value != null,
+                modifier = Modifier.size(48.dp),
+            ) {
                 Icon(painterResource(R.drawable.ic_remove), contentDescription = decreaseDescription)
             }
             Text(
@@ -606,7 +621,13 @@ private fun Stepper(
                     .clickable(onClickLabel = stringResource(R.string.edit), onClick = onEdit)
                     .padding(vertical = 10.dp),
             )
-            FilledTonalIconButton(onClick = onIncrease, modifier = Modifier.size(48.dp)) {
+            FilledTonalIconButton(
+                onClick = {
+                    haptics.perform(increaseHaptic)
+                    onIncrease()
+                },
+                modifier = Modifier.size(48.dp),
+            ) {
                 Icon(painterResource(R.drawable.ic_add), contentDescription = increaseDescription)
             }
         }
@@ -622,6 +643,11 @@ private fun NumberDialog(
     onDismiss: () -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf(initial) }
+    val haptics = rememberHaptics()
+    fun confirm() {
+        haptics.perform(Haptic.SAVE)
+        onConfirm(text)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -634,10 +660,10 @@ private fun NumberDialog(
                     keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number,
                     imeAction = ImeAction.Done,
                 ),
-                keyboardActions = KeyboardActions(onDone = { onConfirm(text) }),
+                keyboardActions = KeyboardActions(onDone = { confirm() }),
             )
         },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text(stringResource(R.string.ok)) } },
+        confirmButton = { TextButton(onClick = { confirm() }) { Text(stringResource(R.string.ok)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
@@ -651,6 +677,7 @@ private fun RestPanel(
     onExtend: () -> Unit,
 ) {
     val seconds = ((remainingMillis + 999) / 1_000).coerceAtLeast(0)
+    val haptics = rememberHaptics()
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
@@ -679,7 +706,10 @@ private fun RestPanel(
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
-                onClick = onExtend,
+                onClick = {
+                    haptics.perform(Haptic.ADD_REST_TIME)
+                    onExtend()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .height(64.dp),
@@ -687,7 +717,10 @@ private fun RestPanel(
                 Text(stringResource(R.string.add_rest_time), style = MaterialTheme.typography.titleMedium)
             }
             Button(
-                onClick = onSkip,
+                onClick = {
+                    haptics.perform(Haptic.SKIP_REST)
+                    onSkip()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .height(64.dp),
@@ -700,10 +733,10 @@ private fun RestPanel(
 
 @Composable
 private fun CompleteSetButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberHaptics()
     Button(
         onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            haptics.perform(Haptic.DONE)
             onClick()
         },
         modifier = modifier
@@ -742,7 +775,7 @@ private fun EmptyCycle(onManageCycle: () -> Unit, modifier: Modifier = Modifier)
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onManageCycle) {
-            Text(stringResource(R.string.manage_cycle))
+            Text(stringResource(R.string.manage_cycle_action))
         }
     }
 }
@@ -806,7 +839,8 @@ private fun previewState(restEndsAt: Long? = null) = ActiveWorkoutUiState.Active
     roundsCompleted = 1,
     entry = SetEntry(weight = 15.0, reps = 12),
     unit = WeightUnit.LB,
-    lastSet = LoggedSet(1, 3, "Shoulders", 15.0, WeightUnit.LB, 12, System.currentTimeMillis()),
+    lastSet = LoggedSet(1, 3, "Shoulders", 15.0, WeightUnit.LB, 12, System.currentTimeMillis(), CableMovement.LATERAL_RAISE),
+    pageEntries = mapOf(CableMovement.LATERAL_RAISE to SetEntry(weight = 15.0, reps = 12)),
     restEndsAt = restEndsAt,
     restSeconds = 60,
 )
@@ -821,6 +855,7 @@ private fun ActiveWorkoutScreenPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onEntryChange = { _, _ -> },
             onSetCompleted = { _, _ -> },
+            onMovementSelected = { _, _ -> },
             onSkipRest = {},
             onExtendRest = {},
             onRestart = {},
@@ -840,6 +875,7 @@ private fun RestingPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onEntryChange = { _, _ -> },
             onSetCompleted = { _, _ -> },
+            onMovementSelected = { _, _ -> },
             onSkipRest = {},
             onExtendRest = {},
             onRestart = {},
@@ -859,6 +895,7 @@ private fun EmptyCyclePreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onEntryChange = { _, _ -> },
             onSetCompleted = { _, _ -> },
+            onMovementSelected = { _, _ -> },
             onSkipRest = {},
             onExtendRest = {},
             onRestart = {},

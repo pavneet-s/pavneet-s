@@ -16,15 +16,16 @@
     <string name="undo">Undo</string>
     <string name="more_options">More options</string>
     <string name="restart_cycle">Restart from the top</string>
-    <string name="empty_cycle_title">No exercises in the rotation</string>
-    <string name="empty_cycle_body">Add an exercise, or switch a skipped one back on, to keep the cycle going.</string>
+    <string name="empty_cycle_title">No muscle groups in the rotation</string>
+    <string name="empty_cycle_body">Add a muscle group, or switch a skipped one back on, to keep the cycle going.</string>
 
-    <!-- Manage cycle -->
-    <string name="manage_cycle">Manage exercises</string>
+    <!-- Manage cycle: the rotation is a list of muscle groups, each with its cable exercises. -->
+    <string name="manage_cycle">Muscle groups</string>
+    <string name="manage_cycle_action">Edit muscle groups</string>
     <string name="back">Back</string>
-    <string name="new_exercise">New exercise</string>
-    <string name="add_exercise">Add exercise</string>
-    <string name="manage_hint">Drag the handle to reorder. Switch an exercise off to skip it without deleting it.</string>
+    <string name="new_exercise">New muscle group</string>
+    <string name="add_exercise">Add muscle group</string>
+    <string name="manage_hint">Drag the handle to reorder. Switch a group off to skip it without deleting it, or tap it to save your machine setup.</string>
     <string name="remove_exercise">Remove %1$s</string>
     <string name="include_in_rotation">Include %1$s in the rotation</string>
     <string name="status_current">Current</string>
@@ -32,23 +33,46 @@
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
 
-    <!-- Cable machine animations -->
+    <!-- Cable machine exercises -->
     <string name="movement_chest_press">Cable chest press</string>
+    <string name="movement_chest_fly">Single-arm cable fly</string>
+    <string name="movement_high_to_low_fly">High-to-low fly</string>
+    <string name="movement_low_to_high_fly">Low-to-high fly</string>
     <string name="movement_row">Cable row</string>
+    <string name="movement_lat_pulldown">Kneeling lat pulldown</string>
     <string name="movement_straight_arm_pulldown">Straight-arm pulldown</string>
-    <string name="movement_face_pull">Face pull</string>
     <string name="movement_lateral_raise">Cable lateral raise</string>
+    <string name="movement_front_raise">Cable front raise</string>
+    <string name="movement_face_pull">Face pull</string>
     <string name="movement_triceps_pushdown">Triceps pushdown</string>
     <string name="movement_overhead_triceps_extension">Overhead triceps extension</string>
+    <string name="movement_triceps_kickback">Triceps kickback</string>
     <string name="movement_biceps_curl">Cable curl</string>
+    <string name="movement_high_cable_curl">High cable curl</string>
+    <string name="movement_behind_back_curl">Behind-the-back curl</string>
+    <string name="movement_glute_kickback">Glute kickback</string>
+    <string name="movement_pull_through">Cable pull-through</string>
+    <string name="movement_cable_crunch">Kneeling cable crunch</string>
+    <string name="movement_woodchopper">Woodchopper</string>
+    <string name="muscle_chest">Chest</string>
+    <string name="muscle_back">Back</string>
+    <string name="muscle_shoulders">Shoulders</string>
+    <string name="muscle_triceps">Triceps</string>
+    <string name="muscle_biceps">Biceps</string>
+    <string name="muscle_legs">Legs and glutes</string>
+    <string name="muscle_core">Core</string>
+    <!-- Page dots under the swipeable exercises, for screen readers. -->
+    <string name="exercise_page">Exercise %1$d of %2$d</string>
+    <!-- Tapping the figure's speech bubble shows another form tip. -->
+    <string name="next_tip">Next tip</string>
     <string name="animation_off">No animation</string>
     <string name="pulley_high">Pulley high</string>
     <string name="pulley_chest">Pulley at chest height</string>
     <string name="pulley_low">Pulley low</string>
     <!-- Caption under the animation, e.g. "Cable row · Pulley at chest height". -->
     <string name="cable_caption">%1$s · %2$s</string>
-    <string name="animation_picker_title">Animation for %1$s</string>
-    <string name="animation_chip_description">Animation for %1$s: %2$s</string>
+    <string name="animation_picker_title">Cable exercise for %1$s</string>
+    <string name="animation_chip_description">Cable exercise for %1$s: %2$s</string>
 
     <!-- Common -->
     <string name="ok">OK</string>
@@ -109,7 +133,7 @@
     <string name="notification_rest_over_next">Time for %1$s</string>
 
     <!-- Exercise editor -->
-    <string name="edit_exercise_action">Edit exercise</string>
+    <string name="edit_exercise_action">Edit muscle group</string>
     <string name="edit_exercise_title">Edit %1$s</string>
     <string name="exercise_name">Name</string>
     <string name="attachment_label">Attachment</string>
@@ -153,6 +177,8 @@
     <string name="legend_less">Less</string>
     <string name="legend_more">More</string>
     <string name="progress_title">Weight progress</string>
+    <!-- A muscle group and one of its cable exercises, e.g. "Chest · Cable fly". -->
+    <string name="progress_title_with_movement">%1$s · %2$s</string>
     <string name="progress_up_since">Up %1$s since %2$s</string>
     <string name="progress_down_since">Down %1$s since %2$s</string>
     <string name="progress_same_since">No change since %1$s</string>

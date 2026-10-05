@@ -54,14 +54,20 @@ interface WorkoutDao {
     @Query("SELECT * FROM set_logs ORDER BY completed_at, id")
     fun observeLogs(): Flow<List<SetLogEntity>>
 
-    @Query("SELECT * FROM set_logs WHERE exercise_id = :exerciseId ORDER BY completed_at DESC, id DESC LIMIT 1")
-    suspend fun lastLogFor(exerciseId: Long): SetLogEntity?
+    /** The last set of [exerciseId] done as [movement] (`IS` also matches a null movement). */
+    @Query(
+        """
+        SELECT * FROM set_logs WHERE exercise_id = :exerciseId AND movement IS :movement
+        ORDER BY completed_at DESC, id DESC LIMIT 1
+        """,
+    )
+    suspend fun lastLogFor(exerciseId: Long, movement: String?): SetLogEntity?
 
-    /** The most recent set for every exercise that still exists. */
+    /** The most recent set of each cable exercise of every exercise that still exists. */
     @Query(
         """
         SELECT * FROM set_logs
-        WHERE id IN (SELECT MAX(id) FROM set_logs WHERE exercise_id IS NOT NULL GROUP BY exercise_id)
+        WHERE id IN (SELECT MAX(id) FROM set_logs WHERE exercise_id IS NOT NULL GROUP BY exercise_id, movement)
         """,
     )
     fun observeLatestLogs(): Flow<List<SetLogEntity>>

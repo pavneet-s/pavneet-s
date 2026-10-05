@@ -43,6 +43,27 @@ wait_for() {
 wait_for_text() { wait_for text "$1"; }
 wait_for_desc() { wait_for content-desc "$1"; }
 
+# The text of the figure's speech bubble (tagged "form_tip"), or nothing if it isn't shown.
+tip_text() {
+  screen | grep -o '<node [^>]*resource-id="form_tip"[^>]*>' | grep -o ' text="[^"]*"' | head -n 1
+}
+
+# Swipes the exercise pager: "left" shows the next cable exercise, "right" the previous one.
+swipe_pager() {
+  local bounds width y
+  bounds=$(screen | grep -o '<node [^>]*resource-id="form_tip"[^>]*>' | grep -o 'bounds="[^"]*"' | head -n 1)
+  [ -n "$bounds" ] || fail "no speech bubble to swipe the pager by"
+  # Just below the bubble, over the animation.
+  y=$(echo "$bounds" | tr -c '0-9' ' ' | awk '{ print $4 + 120 }')
+  width=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -n 1 | cut -dx -f1)
+  if [ "$1" = left ]; then
+    adb shell input swipe $((width * 4 / 5)) "$y" $((width / 5)) "$y" 300
+  else
+    adb shell input swipe $((width / 5)) "$y" $((width * 4 / 5)) "$y" 300
+  fi
+  sleep 1
+}
+
 # Waits for a node whose text is exactly $1.
 wait_for_exact() {
   for _ in $(seq 1 30); do
@@ -81,6 +102,8 @@ for BASELINE_APK in "$@"; do
   echo "== $BASELINE_APK: complete one set, then upgrade in place"
   adb uninstall "$PACKAGE" >/dev/null 2>&1 || true
   adb install "$BASELINE_APK"
+  # Releases that ask for notifications get it up front, so no dialog covers the app.
+  adb shell pm grant "$PACKAGE" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
   launch
   wait_for_text "Push-ups" || fail "$BASELINE_APK did not start"
   tap 'text="Done"'
@@ -93,10 +116,27 @@ for BASELINE_APK in "$@"; do
   adb logcat -c
   launch
   wait_for_text "2 of 5" || fail "progress was lost, or the app crashed, upgrading from $BASELINE_APK"
-  wait_for_text "Back stretches" || fail "the current exercise changed upgrading from $BASELINE_APK"
+  wait_for_exact "Back" || fail "Back stretches was not renamed to Back upgrading from $BASELINE_APK"
   wait_for_text "Cable row" || fail "no cable animation after upgrading from $BASELINE_APK"
 done
+# The latest release starts a rest after Done; skip it to get the set controls back.
+if screen | grep -q 'text="Skip rest"'; then tap 'text="Skip rest"'; fi
+wait_for_exact "Done" || fail "no Done button after the upgrades"
 screenshot 1-active
+
+echo "== The figure talks through form tips, a new one every few seconds"
+wait_for resource-id "form_tip" || fail "no speech bubble over the figure"
+FIRST_TIP=$(tip_text)
+[ -n "$FIRST_TIP" ] || fail "the speech bubble is empty"
+sleep 8
+[ "$(tip_text)" != "$FIRST_TIP" ] || fail "the form tip did not change: $FIRST_TIP"
+
+echo "== Swipe between Back's cable exercises"
+swipe_pager left
+wait_for_text "Kneeling lat pulldown" || fail "swiping did not show the next back exercise"
+screenshot 1b-swiped
+swipe_pager right
+wait_for_text "Cable row" || fail "swiping back did not return to the cable row"
 
 echo "== Log weight and reps, then rest"
 wait_for_text "First time" || fail "no first-time hint for an exercise never logged"
@@ -117,8 +157,8 @@ tap 'text="Skip rest"'
 wait_for_exact "Done" || fail "Skip rest did not bring back the Done button"
 
 echo "== Save the machine setup for Shoulders"
-tap 'content-desc="Manage exercises"'
-wait_for_text "Drag the handle" || fail "the Manage exercises screen never appeared"
+tap 'content-desc="Edit muscle groups"'
+wait_for_text "Drag the handle" || fail "the muscle groups screen never appeared"
 tap 'text="Shoulders"'
 wait_for_text "Edit Shoulders" || fail "the exercise editor never opened"
 tap 'text="Handle"'
@@ -150,7 +190,7 @@ echo "== History"
 tap 'content-desc="History"'
 wait_for_text "Day streak" || fail "the History screen never appeared"
 wait_for_text "Training days" || fail "no training calendar"
-wait_for_text "Back stretches" || fail "History does not list the logged exercise"
+wait_for_text "Back · Cable row" || fail "History does not chart the logged cable exercise"
 screenshot 6-history
 adb shell input keyevent KEYCODE_BACK
 wait_for_exact "Done" || fail "could not get back to the workout from History"
@@ -170,4 +210,4 @@ wait_for_notification "Rest over" 45 || fail "no rest-over alert after a 30 s re
 wait_for_exact "Done" || fail "the Done button did not come back after the rest"
 
 adb shell pidof "$PACKAGE" >/dev/null || fail "the app is no longer running"
-echo "Smoke test passed: upgrades kept progress; logging, rest, setup, notification Done, history and the rest alert work."
+echo "Smoke test passed: upgrades kept progress; tips, swiping, logging, rest, setup, notification Done, history and the rest alert work."

@@ -20,6 +20,7 @@ class WorkoutHistoryTest {
         unit: WeightUnit? = weight?.let { WeightUnit.LB },
         exerciseId: Long? = 1,
         time: LocalTime = LocalTime.of(18, 0),
+        movement: CableMovement? = null,
     ) = LoggedSet(
         id = nextId++,
         exerciseId = exerciseId,
@@ -28,6 +29,7 @@ class WorkoutHistoryTest {
         unit = unit,
         reps = 10,
         completedAt = date.atTime(time).atZone(zone).toInstant().toEpochMilli(),
+        movement = movement,
     )
 
     private fun history(vararg sets: LoggedSet) = WorkoutHistory(sets.toList(), zone, today)
@@ -134,6 +136,23 @@ class WorkoutHistoryTest {
         )
 
         assertEquals(listOf("Biceps", "Push-ups"), history.progress.map { it.exerciseName })
+    }
+
+    @Test
+    fun `each cable exercise of a muscle group gets its own progress`() {
+        val history = history(
+            set(today.minusDays(3), name = "Chest", weight = 60.0, movement = CableMovement.CHEST_PRESS),
+            set(today.minusDays(1), name = "Chest", weight = 20.0, movement = CableMovement.CHEST_FLY),
+            set(today, name = "Chest", weight = 65.0, movement = CableMovement.CHEST_PRESS),
+        )
+
+        assertEquals(
+            listOf(CableMovement.CHEST_PRESS, CableMovement.CHEST_FLY),
+            history.progress.map { it.movement },
+        )
+        val press = history.progress.first()
+        assertEquals(5.0, press.change, 0.0)
+        assertEquals(listOf(60.0, 65.0), press.points.map { it.weight })
     }
 
     @Test

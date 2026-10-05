@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
@@ -23,37 +24,49 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pavneet.workoutcycle.R
 import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.CableMovement
+import com.pavneet.workoutcycle.domain.MuscleGroup
+import com.pavneet.workoutcycle.ui.Haptic
 import com.pavneet.workoutcycle.ui.cable.CableMachineAnimation
 import com.pavneet.workoutcycle.ui.cable.CableScene
 import com.pavneet.workoutcycle.ui.cable.labelRes
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import kotlinx.coroutines.launch
 
 private const val PREVIEW_ASPECT_RATIO = CableScene.VIEW_WIDTH / CableScene.VIEW_HEIGHT
 
-/** Bottom sheet of live previews for choosing which cable movement an exercise shows. */
+/**
+ * Bottom sheet of live previews for choosing the cable exercise a muscle group shows, grouped by
+ * muscle with [group]'s own exercises first.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnimationPickerSheet(
     exerciseName: String,
+    group: MuscleGroup?,
     selected: CableMovement?,
     onSelect: (AnimationSetting) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    val groups = remember(group) { MuscleGroup.entries.sortedBy { if (it == group) 0 else 1 } }
 
     fun choose(setting: AnimationSetting) {
+        haptics.perform(Haptic.SELECT)
         onSelect(setting)
         scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
     }
@@ -70,20 +83,32 @@ fun AnimationPickerSheet(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(CableMovement.entries, key = { it.name }) { movement ->
-                PickerTile(
-                    title = stringResource(movement.labelRes),
-                    subtitle = stringResource(movement.pulley.labelRes),
-                    isSelected = movement == selected,
-                    onClick = { choose(AnimationSetting.Fixed(movement)) },
-                ) { containerColor ->
-                    CableMachineAnimation(
-                        movement = movement,
+            for (muscleGroup in groups) {
+                item(key = "header-$muscleGroup", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = stringResource(muscleGroup.labelRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(PREVIEW_ASPECT_RATIO),
-                        containerColor = containerColor,
+                            .padding(top = 8.dp)
+                            .semantics { heading() },
                     )
+                }
+                items(muscleGroup.movements, key = { it.name }) { movement ->
+                    PickerTile(
+                        title = stringResource(movement.labelRes),
+                        subtitle = stringResource(movement.pulley.labelRes),
+                        isSelected = movement == selected,
+                        onClick = { choose(AnimationSetting.Fixed(movement)) },
+                    ) { containerColor ->
+                        CableMachineAnimation(
+                            movement = movement,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(PREVIEW_ASPECT_RATIO),
+                            containerColor = containerColor,
+                        )
+                    }
                 }
             }
             item(key = "off") {

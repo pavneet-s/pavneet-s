@@ -12,9 +12,13 @@ data class Session(val date: LocalDate, val setCount: Int, val exerciseNames: Li
 /** The heaviest weight logged for an exercise on one day. */
 data class ProgressPoint(val date: LocalDate, val weight: Double)
 
-/** Weight progress for one exercise, in the unit it was most recently logged in. */
+/**
+ * Weight progress for one cable exercise of a muscle group (or one exercise without an
+ * animation), in the unit it was most recently logged in.
+ */
 data class ExerciseProgress(
     val exerciseName: String,
+    val movement: CableMovement?,
     val unit: WeightUnit,
     /** One point per training day, oldest first. */
     val points: List<ProgressPoint>,
@@ -78,11 +82,14 @@ class WorkoutHistory(sets: List<LoggedSet>, private val zone: ZoneId, val today:
         .sortedByDescending { it.key }
         .map { (date, sets) -> Session(date, sets.size, sets.map { it.exerciseName }.distinct()) }
 
-    /** Exercises with logged weights, most recently trained first. */
+    /**
+     * Exercises with logged weights, most recently trained first. Each cable exercise of a
+     * muscle group is charted on its own, since a fly and a press use very different weights.
+     */
     val progress: List<ExerciseProgress> = sorted
         .filter { it.weight != null && it.unit != null }
         // An exercise keeps its history through renames; deleted ones fall back to their name.
-        .groupBy { it.exerciseId?.let { id -> "id:$id" } ?: "name:${it.exerciseName}" }
+        .groupBy { (it.exerciseId?.let { id -> "id:$id" } ?: "name:${it.exerciseName}") to it.movement }
         .values
         .map { sets ->
             val latest = sets.last()
@@ -92,7 +99,7 @@ class WorkoutHistory(sets: List<LoggedSet>, private val zone: ZoneId, val today:
                 .groupBy { it.date() }
                 .map { (date, daySets) -> ProgressPoint(date, daySets.maxOf { it.weight!! }) }
                 .sortedBy { it.date }
-            ExerciseProgress(latest.exerciseName, unit, points) to latest.completedAt
+            ExerciseProgress(latest.exerciseName, latest.movement, unit, points) to latest.completedAt
         }
         .sortedByDescending { it.second }
         .map { it.first }

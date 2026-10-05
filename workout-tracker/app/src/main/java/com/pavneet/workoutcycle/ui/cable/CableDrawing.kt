@@ -1,5 +1,7 @@
 package com.pavneet.workoutcycle.ui.cable
 
+import com.pavneet.workoutcycle.domain.StackLoad
+
 /** Colour roles; the Compose renderer maps them onto the Material theme. */
 enum class Ink { BACKGROUND, FLOOR, MACHINE, PLATE, PLATE_LIFTED, CABLE, FIGURE_FAR, FIGURE, HANDLE }
 
@@ -32,14 +34,20 @@ object CableDrawing {
     private const val LIMB_WIDTH = 3.3f
     private const val TORSO_WIDTH = 5.2f
     private const val HALO_WIDTH = LIMB_WIDTH + 1.8f
-    private const val PLATES = 9
-    private const val LIFTED_PLATES = 4
-    private const val PLATE_PITCH = 3f
-    private const val PLATE_HEIGHT = 2.3f
+    private const val PLATES = StackLoad.STACK_PLATES
+    private const val PLATE_PITCH = 2.6f
+    private const val PLATE_HEIGHT = 2f
+    private const val PLATE_INSET = 1.8f
+    private const val HALF_PLATE_HEIGHT = 1.2f
+    private const val HALF_PLATE_INSET = 3.4f
     private const val STACK_TRAVEL = 10f
 
-    fun shapes(frame: CableFrame): List<SceneShape> = buildList {
-        addMachine(frame)
+    /** For previews with no weight of their own to show. */
+    val PREVIEW_LOAD = StackLoad(plates = 4)
+
+    /** [load] is how much of the weight stack is pinned, so heavier sets light up more plates. */
+    fun shapes(frame: CableFrame, load: StackLoad = PREVIEW_LOAD): List<SceneShape> = buildList {
+        addMachine(frame, load)
         val cable = SceneShape.Line(frame.pulley, frame.handle, 0.6f, Ink.CABLE)
         // From the side the cable runs beside the body; from the front it crosses in front of it.
         if (!frame.frontView) add(cable)
@@ -48,26 +56,40 @@ object CableDrawing {
         add(SceneShape.Circle(frame.handle, 1.7f, Ink.HANDLE))
     }
 
-    private fun MutableList<SceneShape>.addMachine(frame: CableFrame): Unit = with(CableScene) {
+    private fun MutableList<SceneShape>.addMachine(frame: CableFrame, load: StackLoad): Unit = with(CableScene) {
         add(SceneShape.Line(ScenePoint(4f, FLOOR_Y), ScenePoint(98f, FLOOR_Y), 0.8f, Ink.FLOOR))
         add(SceneShape.Box(COLUMN_LEFT, COLUMN_TOP, COLUMN_RIGHT, FLOOR_Y, corner = 1.5f, Ink.MACHINE, strokeWidth = 1.1f))
         for (rodX in listOf(COLUMN_LEFT + 3.2f, COLUMN_RIGHT - 3.2f)) {
             add(SceneShape.Line(ScenePoint(rodX, COLUMN_TOP + 5f), ScenePoint(rodX, FLOOR_Y - 1f), 0.5f, Ink.MACHINE))
         }
 
-        // The top plates (the selected weight) rise with the lift; the rest stay down.
+        // The pin picks how many plates from the top rise with the lift; the rest stay down.
+        val pinned = load.plates.coerceIn(0, PLATES)
+        val lift = frame.stackLift * STACK_TRAVEL
         var stackTop = FLOOR_Y
         for (plate in 0 until PLATES) {
-            val lifted = plate >= PLATES - LIFTED_PLATES
-            val bottom = FLOOR_Y - 1.2f - plate * PLATE_PITCH - if (lifted) frame.stackLift * STACK_TRAVEL else 0f
+            val lifted = plate >= PLATES - pinned
+            val bottom = FLOOR_Y - 1.2f - plate * PLATE_PITCH - if (lifted) lift else 0f
             add(
                 SceneShape.Box(
-                    COLUMN_LEFT + 1.8f, bottom - PLATE_HEIGHT, COLUMN_RIGHT - 1.8f, bottom,
+                    COLUMN_LEFT + PLATE_INSET, bottom - PLATE_HEIGHT, COLUMN_RIGHT - PLATE_INSET, bottom,
                     corner = 0.6f,
                     ink = if (lifted) Ink.PLATE_LIFTED else Ink.PLATE,
                 ),
             )
             stackTop = bottom - PLATE_HEIGHT
+        }
+        // A half-plate add-on rides on top, for the 5 lb (or 2.5 kg) between plates.
+        if (load.halfPlate) {
+            val bottom = stackTop - (PLATE_PITCH - PLATE_HEIGHT) - if (pinned == 0) lift else 0f
+            add(
+                SceneShape.Box(
+                    COLUMN_LEFT + HALF_PLATE_INSET, bottom - HALF_PLATE_HEIGHT, COLUMN_RIGHT - HALF_PLATE_INSET, bottom,
+                    corner = 0.5f,
+                    ink = Ink.PLATE_LIFTED,
+                ),
+            )
+            stackTop = bottom - HALF_PLATE_HEIGHT
         }
         val centerX = (COLUMN_LEFT + COLUMN_RIGHT) / 2f
         add(SceneShape.Line(ScenePoint(centerX, stackTop), ScenePoint(centerX, COLUMN_TOP + 2.5f), 0.5f, Ink.CABLE))

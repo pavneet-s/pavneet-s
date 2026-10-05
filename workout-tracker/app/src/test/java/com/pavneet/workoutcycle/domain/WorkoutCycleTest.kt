@@ -15,8 +15,8 @@ class WorkoutCycleTest {
 
     @Test
     fun `starts at the first exercise when no pointer is stored`() {
-        assertEquals("Push-ups", defaultCycle.current?.name)
-        assertEquals("Back stretches", defaultCycle.upNext?.name)
+        assertEquals("Chest", defaultCycle.current?.name)
+        assertEquals("Back", defaultCycle.upNext?.name)
         assertEquals(1, defaultCycle.roundPosition)
     }
 
@@ -30,7 +30,7 @@ class WorkoutCycleTest {
         }
 
         assertEquals(WorkoutCycle.DEFAULT_EXERCISES, seen)
-        assertEquals("Push-ups", cycle.current?.name)
+        assertEquals("Chest", cycle.current?.name)
         assertEquals(5, cycle.setsCompleted)
         assertEquals(1, cycle.roundsCompleted)
     }
@@ -48,7 +48,7 @@ class WorkoutCycleTest {
         val onBiceps = defaultCycle.copy(currentExerciseId = 5)
 
         assertEquals("Biceps", onBiceps.current?.name)
-        assertEquals("Push-ups", onBiceps.upNext?.name)
+        assertEquals("Chest", onBiceps.upNext?.name)
     }
 
     @Test
@@ -57,7 +57,7 @@ class WorkoutCycleTest {
         val afterSecondTap = afterFirstTap.completeSet(1)
 
         assertSame(afterFirstTap, afterSecondTap)
-        assertEquals("Back stretches", afterSecondTap.current?.name)
+        assertEquals("Back", afterSecondTap.current?.name)
     }
 
     @Test
@@ -80,7 +80,7 @@ class WorkoutCycleTest {
     fun `re-enabling a skipped exercise does not move the pointer back`() {
         val cycle = defaultCycle.setActive(1, active = false).setActive(1, active = true)
 
-        assertEquals("Back stretches", cycle.current?.name)
+        assertEquals("Back", cycle.current?.name)
     }
 
     @Test
@@ -95,7 +95,7 @@ class WorkoutCycleTest {
     fun `removing the current last exercise wraps to the first`() {
         val cycle = defaultCycle.copy(currentExerciseId = 5).remove(5)
 
-        assertEquals("Push-ups", cycle.current?.name)
+        assertEquals("Chest", cycle.current?.name)
     }
 
     @Test
@@ -154,7 +154,7 @@ class WorkoutCycleTest {
             .completeCurrent().completeCurrent()
             .restart()
 
-        assertEquals("Back stretches", cycle.current?.name)
+        assertEquals("Back", cycle.current?.name)
         assertEquals(0, cycle.setsCompleted)
         assertEquals(0, cycle.roundsCompleted)
     }

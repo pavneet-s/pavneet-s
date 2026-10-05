@@ -1,6 +1,7 @@
 package com.pavneet.workoutcycle.session
 
 import com.pavneet.workoutcycle.data.WorkoutRepository
+import com.pavneet.workoutcycle.domain.SetKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -32,8 +33,9 @@ class WorkoutNotificationSync(
                     WorkoutNotificationState(
                         exerciseId = current.id,
                         exerciseName = current.name,
+                        movement = current.movement,
                         nextName = cycle.upNext?.takeIf { it.id != current.id }?.name,
-                        lastSet = lastSets[current.id],
+                        lastSet = lastSets[SetKey(current.id, current.movement)],
                         restEndsAt = cycle.restEndsAt?.takeIf { cycle.isResting(now) },
                         hideAt = activeUntil,
                     )

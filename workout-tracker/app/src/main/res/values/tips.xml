@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Common mistakes for each cable exercise, said by the figure in the animation's speech
+     bubble. One rotates in every few seconds; keep each short enough for three lines. -->
+<resources>
+    <string-array name="tips_chest_press">
+        <item>Don\'t let your elbows flare straight out. Keep them about 45° from your body.</item>
+        <item>Stagger your feet and brace. If the cable pulls you back, take a step forward.</item>
+        <item>Press out, not up. Your hands finish in front of your chest, not your face.</item>
+        <item>Keep your shoulders down and back. No shrugging as you press!</item>
+        <item>Control the way back. Don\'t let the weight yank your arms behind you.</item>
+    </string-array>
+
+    <string-array name="tips_chest_fly">
+        <item>Soft elbows! Locking your arm out loads the joint instead of your chest.</item>
+        <item>Hug a big tree. The bend in your elbow shouldn\'t change during the rep.</item>
+        <item>Don\'t twist your body to drag the handle across. Stay square.</item>
+        <item>Squeeze your chest in the middle and pause for a second.</item>
+        <item>Go lighter than you think. Flys are about the stretch, not the weight.</item>
+    </string-array>
+
+    <string-array name="tips_high_to_low_fly">
+        <item>Sweep down and across toward your opposite hip, not straight down.</item>
+        <item>Lean forward a little from your hips and keep your chest proud.</item>
+        <item>Don\'t bend your elbow more as you pull. That turns it into a press.</item>
+        <item>Keep your shoulder down. Shrugging takes the work off your chest.</item>
+        <item>Slow on the way back up. Feel the stretch across your chest.</item>
+    </string-array>
+
+    <string-array name="tips_low_to_high_fly">
+        <item>Scoop up and across to about chin height. Higher hands it to your shoulders.</item>
+        <item>Keep a soft bend in your elbow. Don\'t curl the handle up.</item>
+        <item>Don\'t lean back to swing it. Your body stays still.</item>
+        <item>Squeeze your upper chest, right under your collarbone.</item>
+        <item>Keep your palm facing up as you lift.</item>
+    </string-array>
+
+    <string-array name="tips_row">
+        <item>Lead with your elbows. Pull them back past your ribs, not just your hands.</item>
+        <item>Don\'t rock back and forth. Let your back do the pulling.</item>
+        <item>Squeeze your shoulder blades together at the end and hold for a beat.</item>
+        <item>Shoulders down, away from your ears. No shrugging!</item>
+        <item>Let your arms straighten all the way out for the stretch.</item>
+    </string-array>
+
+    <string-array name="tips_lat_pulldown">
+        <item>Pull your elbows down to your sides, like tucking them into your back pockets.</item>
+        <item>Don\'t lean way back. A slight lean is fine, but this isn\'t a row.</item>
+        <item>Pull to your upper chest, never behind your neck.</item>
+        <item>Let your arms go all the way up for the stretch, then pull your shoulders down first.</item>
+        <item>Don\'t yank with your arms. Your back starts every rep.</item>
+    </string-array>
+
+    <string-array name="tips_straight_arm_pulldown">
+        <item>Keep your arms almost straight. Bending them turns this into a pushdown.</item>
+        <item>Hinge forward a little and keep your back flat.</item>
+        <item>Sweep down in an arc to your thighs. Think lats, not triceps.</item>
+        <item>Don\'t let your shoulders roll forward at the bottom.</item>
+        <item>Slow on the way up. Feel the stretch along your sides.</item>
+    </string-array>
+
+    <string-array name="tips_lateral_raise">
+        <item>Lead with your elbow, not your hand, like pouring water from a jug.</item>
+        <item>Stop at shoulder height. Going higher hands the work to your traps.</item>
+        <item>No swinging! If your body moves, the weight is too heavy.</item>
+        <item>Keep your shoulder down. Shrugging steals the work from your delts.</item>
+        <item>Lower it slowly. The way down builds muscle too.</item>
+    </string-array>
+
+    <string-array name="tips_front_raise">
+        <item>Raise to shoulder height and no higher.</item>
+        <item>Don\'t lean back to swing it up. Keep your core tight.</item>
+        <item>Keep a soft bend in your elbow. Don\'t lock it out.</item>
+        <item>Breathe out as you lift, then lower slowly.</item>
+        <item>Stand tall. Rounding forward turns this into a shrug.</item>
+    </string-array>
+
+    <string-array name="tips_face_pull">
+        <item>Pull toward your forehead, not your chin. Elbows high!</item>
+        <item>Pull the rope apart as it comes in, so your hands end beside your ears.</item>
+        <item>Don\'t lean back to move more weight. Light and strict wins here.</item>
+        <item>Squeeze your upper back and hold for a second at the end.</item>
+        <item>Keep your neck neutral. Don\'t poke your chin toward the rope.</item>
+    </string-array>
+
+    <string-array name="tips_triceps_pushdown">
+        <item>Pin your elbows to your sides. If they move, it\'s a press, not a pushdown.</item>
+        <item>Don\'t lean over the rope to push it down. Stand tall.</item>
+        <item>Straighten your arms fully and squeeze your triceps at the bottom.</item>
+        <item>Don\'t let it fly back up. Control it to chest height.</item>
+        <item>Keep your wrists straight, not bent back.</item>
+    </string-array>
+
+    <string-array name="tips_overhead_triceps_extension">
+        <item>Keep your elbows pointing forward. Don\'t let them flare out wide.</item>
+        <item>Your upper arms stay still. Only your forearms move.</item>
+        <item>Get a deep stretch behind your head before you extend.</item>
+        <item>Brace your core so your lower back doesn\'t arch.</item>
+        <item>Stagger your stance. You\'ll be much steadier.</item>
+    </string-array>
+
+    <string-array name="tips_triceps_kickback">
+        <item>Keep your upper arm level with the floor and pinned to your side.</item>
+        <item>Don\'t swing it. Your elbow is the only joint that moves.</item>
+        <item>Straighten all the way and squeeze for a second.</item>
+        <item>Keep your back flat, not rounded.</item>
+        <item>Go lighter. Kickbacks punish ego lifting!</item>
+    </string-array>
+
+    <string-array name="tips_biceps_curl">
+        <item>Elbows stay at your sides. Don\'t let them drift forward.</item>
+        <item>No hip swing! If your body rocks, drop the weight.</item>
+        <item>Squeeze at the top, then lower slowly. Don\'t just let it drop.</item>
+        <item>Keep your wrists straight. Curling them in cheats your biceps.</item>
+        <item>Straighten your arms fully at the bottom for the whole stretch.</item>
+    </string-array>
+
+    <string-array name="tips_high_cable_curl">
+        <item>Keep your upper arm level. Don\'t let your elbow sag.</item>
+        <item>Curl the handle toward your ear, like flexing in the mirror.</item>
+        <item>Don\'t lean toward the machine to shorten the pull.</item>
+        <item>Pause and squeeze at the top. That peak is the whole point.</item>
+        <item>Let your arm straighten slowly on the way back.</item>
+    </string-array>
+
+    <string-array name="tips_behind_back_curl">
+        <item>Let your arm hang behind you for a big stretch at the bottom.</item>
+        <item>Keep your elbow back. Don\'t let it swing forward to help.</item>
+        <item>Step out far enough that the cable stays tight the whole time.</item>
+        <item>Stand tall. No bowing forward to finish the rep.</item>
+        <item>Go slow on the way down. The stretch is where this one shines.</item>
+    </string-array>
+
+    <string-array name="tips_glute_kickback">
+        <item>Kick back with your heel, not your toes, to feel it in your glutes.</item>
+        <item>Don\'t arch your lower back to get the leg higher.</item>
+        <item>Keep your hips square. Don\'t twist them open.</item>
+        <item>Squeeze your glute at the top and hold for a second.</item>
+        <item>Hold the machine and keep your standing knee soft.</item>
+    </string-array>
+
+    <string-array name="tips_pull_through">
+        <item>Hinge at the hips. Push your butt back, don\'t squat down.</item>
+        <item>Keep your arms straight. They\'re just hooks; your hips do the work.</item>
+        <item>Drive your hips forward and squeeze your glutes at the top.</item>
+        <item>Don\'t lean back at the top. Stand tall and stop.</item>
+        <item>Keep your back flat the whole time. No rounding.</item>
+    </string-array>
+
+    <string-array name="tips_cable_crunch">
+        <item>Curl your ribs toward your hips. Don\'t just bow from the hips.</item>
+        <item>Keep your hips still. If your butt moves back, your abs aren\'t doing it.</item>
+        <item>Hold the rope by your head. Don\'t pull it down with your arms.</item>
+        <item>Breathe out hard as you crunch down.</item>
+        <item>Control the way up. Don\'t let the stack yank you upright.</item>
+    </string-array>
+
+    <string-array name="tips_woodchopper">
+        <item>Turn through your torso, not just your arms.</item>
+        <item>Pivot your back foot as you turn. Your knees will thank you.</item>
+        <item>Keep your arms nearly straight. They just guide the handle.</item>
+        <item>Control the return. Don\'t let the cable spin you back.</item>
+        <item>Brace your core like someone is about to poke your stomach.</item>
+    </string-array>
+</resources>

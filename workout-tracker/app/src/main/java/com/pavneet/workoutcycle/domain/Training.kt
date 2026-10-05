@@ -1,12 +1,17 @@
 package com.pavneet.workoutcycle.domain
 
-/** How weights are counted. [step] is one tap of the +/- buttons. */
-enum class WeightUnit(val step: Double) {
-    KG(2.5),
-    LB(5.0),
+import kotlin.math.roundToInt
+
+/**
+ * How weights are counted. [step] is one tap of the +/- buttons; [plateWeight] is what one
+ * plate of the animated weight stack stands for.
+ */
+enum class WeightUnit(val step: Double, val plateWeight: Double) {
+    KG(2.5, 5.0),
+    LB(5.0, 10.0),
 
     /** The pin position on a numbered stack, e.g. "Plate 7". */
-    PLATE(1.0),
+    PLATE(1.0, 1.0),
     ;
 
     /** One step up; an empty weight starts at one step. */
@@ -31,7 +36,31 @@ data class SetEntry(val weight: Double? = null, val reps: Int? = null) {
     }
 }
 
-/** A completed set, as stored in the history. The name is kept even if the exercise is deleted. */
+/**
+ * How much of the cable machine's weight stack a set lifts, for the animation: whole plates
+ * plus a half-plate add-on for the step in between (5 lb or 2.5 kg).
+ */
+data class StackLoad(val plates: Int, val halfPlate: Boolean = false) {
+    companion object {
+        /** Plates in the animated stack; heavier sets lift all of them. */
+        const val STACK_PLATES = 15
+
+        /** No weight entered, so nothing on the pin. */
+        val EMPTY = StackLoad(plates = 0)
+
+        fun of(weight: Double?, unit: WeightUnit): StackLoad {
+            if (weight == null || weight <= 0.0) return EMPTY
+            val halfPlates = (weight / (unit.plateWeight / 2)).roundToInt().coerceIn(1, STACK_PLATES * 2 + 1)
+            return StackLoad(plates = halfPlates / 2, halfPlate = halfPlates % 2 == 1)
+        }
+    }
+}
+
+/**
+ * A completed set, as stored in the history. The name is kept even if the exercise is deleted.
+ *
+ * @property movement the cable exercise done for the muscle group, if it had one.
+ */
 data class LoggedSet(
     val id: Long,
     val exerciseId: Long?,
@@ -41,7 +70,11 @@ data class LoggedSet(
     val reps: Int?,
     /** Epoch milliseconds. */
     val completedAt: Long,
+    val movement: CableMovement? = null,
 )
+
+/** What a set is remembered by: its slot in the rotation and the cable exercise done for it. */
+data class SetKey(val exerciseId: Long, val movement: CableMovement?)
 
 enum class Attachment { ROPE, HANDLE, STRAIGHT_BAR, V_BAR, ANKLE_STRAP }
 

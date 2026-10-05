@@ -15,15 +15,19 @@ import androidx.core.content.ContextCompat
 import com.pavneet.workoutcycle.MainActivity
 import com.pavneet.workoutcycle.R
 import com.pavneet.workoutcycle.WorkoutCycleApp
+import com.pavneet.workoutcycle.domain.CableMovement
 import com.pavneet.workoutcycle.domain.LoggedSet
 import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.domain.formatWeight
+import com.pavneet.workoutcycle.ui.cable.labelRes
 import kotlinx.coroutines.launch
 
 /** What the workout notification shows; rebuilt whenever the workout changes. */
 data class WorkoutNotificationState(
     val exerciseId: Long,
     val exerciseName: String,
+    /** The muscle group's cable exercise, named so the watch shows which one is up. */
+    val movement: CableMovement?,
     val nextName: String?,
     /** The set the Done button will repeat, if this exercise has been logged before. */
     val lastSet: LoggedSet?,
@@ -78,10 +82,11 @@ class WorkoutNotifier(private val context: Context) {
             .setSilent(true)
             .setTimeoutAfter((state.hideAt - now).coerceAtLeast(1_000L))
         val lastSet = state.lastSet?.let(::describe)?.let { context.getString(R.string.notification_last_set, it) }
+        val movement = state.movement?.let { context.getString(it.labelRes) }
         if (state.restEndsAt != null) {
             builder
                 .setContentTitle(context.getString(R.string.notification_resting, state.exerciseName))
-                .setContentText(lastSet ?: context.getString(R.string.notification_rest_hint))
+                .setContentText(listOfNotNull(movement, lastSet ?: context.getString(R.string.notification_rest_hint)).joinToString(" · "))
                 .setWhen(state.restEndsAt)
                 .setShowWhen(true)
                 .setUsesChronometer(true)
@@ -89,7 +94,10 @@ class WorkoutNotifier(private val context: Context) {
                 .addAction(R.drawable.ic_skip_next, context.getString(R.string.skip_rest), actionIntent(ACTION_SKIP_REST))
                 .addAction(R.drawable.ic_add, context.getString(R.string.add_rest_time), actionIntent(ACTION_EXTEND_REST))
         } else {
-            val lines = listOfNotNull(lastSet, state.nextName?.let { context.getString(R.string.notification_up_next, it) })
+            val lines = listOfNotNull(
+                listOfNotNull(movement, lastSet).joinToString(" · ").ifEmpty { null },
+                state.nextName?.let { context.getString(R.string.notification_up_next, it) },
+            )
             builder
                 .setContentTitle(context.getString(R.string.notification_now, state.exerciseName))
                 .setContentText(lines.joinToString(" · "))

@@ -36,7 +36,9 @@ import com.pavneet.workoutcycle.R
 import com.pavneet.workoutcycle.domain.Attachment
 import com.pavneet.workoutcycle.domain.Exercise
 import com.pavneet.workoutcycle.domain.MachineSetup
+import com.pavneet.workoutcycle.ui.Haptic
 import com.pavneet.workoutcycle.ui.attachmentLabelRes
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import kotlinx.coroutines.launch
 
 /** Rename an exercise and save how the cable machine is set up for it. */
@@ -58,6 +60,7 @@ fun ExerciseEditorSheet(
         scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
     }
 
+    val haptics = rememberHaptics()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier
@@ -84,7 +87,10 @@ fun ExerciseEditorSheet(
                         FilterChip(
                             selected = attachment == option,
                             // Tapping the selected chip again clears it.
-                            onClick = { attachment = if (attachment == option) null else option },
+                            onClick = {
+                                haptics.perform(Haptic.SELECT)
+                                attachment = if (attachment == option) null else option
+                            },
                             label = { Text(stringResource(option.attachmentLabelRes)) },
                         )
                     }
@@ -109,10 +115,11 @@ fun ExerciseEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { close() }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { haptics.perform(Haptic.NAVIGATE); close() }) { Text(stringResource(R.string.cancel)) }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
+                        haptics.perform(Haptic.SAVE)
                         onSave(name, MachineSetup(attachment, pulleyPosition, note))
                         close()
                     },

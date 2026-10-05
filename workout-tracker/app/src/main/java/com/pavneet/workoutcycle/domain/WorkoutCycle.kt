@@ -1,7 +1,8 @@
 package com.pavneet.workoutcycle.domain
 
 /**
- * One movement in the rotation.
+ * One slot in the rotation, usually a muscle group such as "Chest", trained with one of its
+ * cable exercises ([movement]).
  *
  * @property isActive `false` means "skip it for now": the exercise keeps its slot in the
  * rotation but is passed over until it is switched back on.
@@ -13,13 +14,21 @@ data class Exercise(
     val animation: AnimationSetting = AnimationSetting.Auto,
     val setup: MachineSetup = MachineSetup(),
 ) {
-    /** The cable movement to animate, or `null` for none. */
+    /** The cable exercise to animate and log, or `null` for none. */
     val movement: CableMovement?
         get() = when (animation) {
             AnimationSetting.Auto -> CableMovement.guessFor(name)
             AnimationSetting.Off -> null
             is AnimationSetting.Fixed -> animation.movement
         }
+
+    /** The muscle group trained: the chosen exercise's, or else a guess from the name. */
+    val muscleGroup: MuscleGroup?
+        get() = movement?.group ?: MuscleGroup.guessFor(name)
+
+    /** The cable exercises to swipe between: the muscle group's, or none without an animation. */
+    val movementChoices: List<CableMovement>
+        get() = movement?.group?.movements.orEmpty()
 }
 
 /**
@@ -156,6 +165,6 @@ data class WorkoutCycle(
     }
 
     companion object {
-        val DEFAULT_EXERCISES = listOf("Push-ups", "Back stretches", "Shoulders", "Triceps", "Biceps")
+        val DEFAULT_EXERCISES = listOf("Chest", "Back", "Shoulders", "Triceps", "Biceps")
     }
 }

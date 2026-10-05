@@ -1,6 +1,5 @@
 package com.pavneet.workoutcycle.ui.cable
 
-import androidx.annotation.StringRes
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,9 +22,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import com.pavneet.workoutcycle.R
 import com.pavneet.workoutcycle.domain.CableMovement
-import com.pavneet.workoutcycle.domain.PulleyHeight
+import com.pavneet.workoutcycle.domain.StackLoad
 import kotlin.math.min
 
 /** Rep tempo: a short pause at the bottom, about a second to lift, then a squeeze at the top. */
@@ -37,12 +35,14 @@ private const val TOP_SQUEEZE_MILLIS = 350
  * A looping demonstration of [movement] on a cable machine. It is decorative for screen
  * readers; show the movement's name as text nearby.
  *
+ * @param load how much of the weight stack to light up and lift, e.g. from the weight entered.
  * @param containerColor the background, also used to outline the arm where it crosses the body.
  */
 @Composable
 fun CableMachineAnimation(
     movement: CableMovement,
     modifier: Modifier = Modifier,
+    load: StackLoad = CableDrawing.PREVIEW_LOAD,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
 ) {
     val phase by rememberInfiniteTransition(label = "cableRep").animateFloat(
@@ -65,7 +65,7 @@ fun CableMachineAnimation(
             .clearAndSetSemantics {},
     ) {
         // Reading the phase here, in the draw phase, redraws each frame without recomposing.
-        drawCableFrame(CablePoses.frame(movement, phase)) { ink -> scheme.inkColor(ink, containerColor) }
+        drawCableFrame(CablePoses.frame(movement, phase), load) { ink -> scheme.inkColor(ink, containerColor) }
     }
 }
 
@@ -79,16 +79,23 @@ private fun ColorScheme.inkColor(ink: Ink, background: Color): Color = when (ink
     Ink.FIGURE -> onSurface
 }
 
-/** Draws the scene scaled to fit, centred, keeping its proportions. */
-private fun DrawScope.drawCableFrame(frame: CableFrame, color: (Ink) -> Color) {
+/** Maps scene units onto a canvas of [size]: scaled to fit, centred, keeping the proportions. */
+class SceneFit(size: Size) {
     val scale = min(size.width / CableScene.VIEW_WIDTH, size.height / CableScene.VIEW_HEIGHT)
-    val originX = (size.width - CableScene.VIEW_WIDTH * scale) / 2f
-    val originY = (size.height - CableScene.VIEW_HEIGHT * scale) / 2f
+    private val originX = (size.width - CableScene.VIEW_WIDTH * scale) / 2f
+    private val originY = (size.height - CableScene.VIEW_HEIGHT * scale) / 2f
 
-    fun ScenePoint.toOffset() =
-        Offset(originX + (x - CableScene.VIEW_LEFT) * scale, originY + (y - CableScene.VIEW_TOP) * scale)
+    fun toOffset(point: ScenePoint) =
+        Offset(originX + (point.x - CableScene.VIEW_LEFT) * scale, originY + (point.y - CableScene.VIEW_TOP) * scale)
+}
 
-    for (shape in CableDrawing.shapes(frame)) {
+private fun DrawScope.drawCableFrame(frame: CableFrame, load: StackLoad, color: (Ink) -> Color) {
+    val fit = SceneFit(size)
+    val scale = fit.scale
+
+    fun ScenePoint.toOffset() = fit.toOffset(this)
+
+    for (shape in CableDrawing.shapes(frame, load)) {
         when (shape) {
             is SceneShape.Line -> drawLine(
                 color = color(shape.ink),
@@ -113,24 +120,3 @@ private fun DrawScope.drawCableFrame(frame: CableFrame, color: (Ink) -> Color) {
         }
     }
 }
-
-@get:StringRes
-val CableMovement.labelRes: Int
-    get() = when (this) {
-        CableMovement.CHEST_PRESS -> R.string.movement_chest_press
-        CableMovement.ROW -> R.string.movement_row
-        CableMovement.STRAIGHT_ARM_PULLDOWN -> R.string.movement_straight_arm_pulldown
-        CableMovement.FACE_PULL -> R.string.movement_face_pull
-        CableMovement.LATERAL_RAISE -> R.string.movement_lateral_raise
-        CableMovement.TRICEPS_PUSHDOWN -> R.string.movement_triceps_pushdown
-        CableMovement.OVERHEAD_TRICEPS_EXTENSION -> R.string.movement_overhead_triceps_extension
-        CableMovement.BICEPS_CURL -> R.string.movement_biceps_curl
-    }
-
-@get:StringRes
-val PulleyHeight.labelRes: Int
-    get() = when (this) {
-        PulleyHeight.HIGH -> R.string.pulley_high
-        PulleyHeight.CHEST -> R.string.pulley_chest
-        PulleyHeight.LOW -> R.string.pulley_low
-    }

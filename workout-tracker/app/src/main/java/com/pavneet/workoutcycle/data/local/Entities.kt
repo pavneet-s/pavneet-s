@@ -76,6 +76,8 @@ data class SetLogEntity(
     val reps: Int?,
     /** Epoch milliseconds. */
     @ColumnInfo(name = "completed_at") val completedAt: Long,
+    /** A CableMovement name: which of the muscle group's cable exercises it was. Added in v4. */
+    val movement: String? = null,
 )
 
 /** App preferences in a single row. Missing until first changed; defaults live in AppSettings. Added in v3. */

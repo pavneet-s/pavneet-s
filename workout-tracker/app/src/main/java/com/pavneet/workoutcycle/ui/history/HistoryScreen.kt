@@ -45,7 +45,10 @@ import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.domain.WorkoutHistory
 import com.pavneet.workoutcycle.domain.formatWeight
 import com.pavneet.workoutcycle.session.formatWeightWithUnit
+import com.pavneet.workoutcycle.ui.Haptic
+import com.pavneet.workoutcycle.ui.cable.labelRes
 import com.pavneet.workoutcycle.ui.relativeDay
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
@@ -62,13 +65,14 @@ fun HistoryRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(uiState: HistoryUiState, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.history)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
@@ -136,7 +140,7 @@ private fun HistoryContent(history: WorkoutHistory, contentPadding: PaddingValue
         }
         if (history.progress.isNotEmpty()) {
             item(key = "progress-header") { SectionHeader(stringResource(R.string.progress_title)) }
-            items(history.progress, key = { "progress-${it.exerciseName}-${it.unit}" }) { progress ->
+            items(history.progress, key = { "progress-${it.exerciseName}-${it.movement}-${it.unit}" }) { progress ->
                 ProgressCard(progress, cardColor)
             }
         }
@@ -246,7 +250,9 @@ private fun ProgressCard(progress: ExerciseProgress, cardColor: androidx.compose
         stringResource(R.string.progress_summary, changeText, weight(progress.best))
     }
     HistoryCard(
-        title = progress.exerciseName,
+        // "Chest · Cable fly": each of a muscle group's cable exercises is charted on its own.
+        title = progress.movement?.let { stringResource(R.string.progress_title_with_movement, progress.exerciseName, stringResource(it.labelRes)) }
+            ?: progress.exerciseName,
         color = cardColor,
         trailing = {
             Text(

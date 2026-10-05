@@ -61,6 +61,8 @@ import com.pavneet.workoutcycle.data.WorkoutRepository
 import com.pavneet.workoutcycle.domain.AppSettings
 import com.pavneet.workoutcycle.domain.WeightUnit
 import com.pavneet.workoutcycle.session.WorkoutController
+import com.pavneet.workoutcycle.ui.Haptic
+import com.pavneet.workoutcycle.ui.rememberHaptics
 import com.pavneet.workoutcycle.ui.unitLabelRes
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -149,13 +151,14 @@ fun SettingsScreen(
     onAllowNotifications: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberHaptics()
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptics.perform(Haptic.NAVIGATE); onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
@@ -182,7 +185,10 @@ fun SettingsScreen(
                     AppSettings.REST_CHOICES_SECONDS.forEach { seconds ->
                         FilterChip(
                             selected = settings.restSeconds == seconds,
-                            onClick = { onChange { it.copy(restSeconds = seconds) } },
+                            onClick = {
+                                haptics.perform(Haptic.SELECT)
+                                onChange { it.copy(restSeconds = seconds) }
+                            },
                             label = { Text(restLabel(seconds)) },
                         )
                     }
@@ -195,7 +201,10 @@ fun SettingsScreen(
                 WeightUnit.entries.forEach { unit ->
                     FilterChip(
                         selected = settings.weightUnit == unit,
-                        onClick = { onChange { it.copy(weightUnit = unit) } },
+                        onClick = {
+                            haptics.perform(Haptic.SELECT)
+                            onChange { it.copy(weightUnit = unit) }
+                        },
                         label = { Text(stringResource(unit.unitLabelRes)) },
                     )
                 }
@@ -220,7 +229,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
-                Button(onClick = onAllowNotifications) {
+                Button(onClick = { haptics.perform(Haptic.NAVIGATE); onAllowNotifications() }) {
                     Text(stringResource(R.string.settings_allow_notifications))
                 }
             }
@@ -256,10 +265,14 @@ private fun SectionTitle(text: String) {
 /** A whole-row toggle, so the label is part of the touch target. */
 @Composable
 private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val haptics = rememberHaptics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .toggleable(value = checked, role = Role.Switch) { on ->
+                haptics.perform(Haptic.toggle(on))
+                onCheckedChange(on)
+            }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
