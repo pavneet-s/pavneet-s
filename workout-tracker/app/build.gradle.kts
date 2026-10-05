@@ -21,6 +21,18 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        // A fixed debug key, committed on purpose, so APKs built on GitHub and in Android
+        // Studio can update each other without uninstalling (which would wipe your progress).
+        // It only signs this personal debug build; never use it for a Play Store release.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
