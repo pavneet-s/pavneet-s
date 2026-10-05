@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Workout notification (mirrored to a paired watch) and the rest-over alert. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Rest alarms must fire on time. Android 13+ grants USE_EXACT_ALARM at install;
+         Android 12 uses SCHEDULE_EXACT_ALARM, which it allows by default. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <!-- Buzzes at the end of a rest when notifications are turned off. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:name=".WorkoutCycleApp"
         android:allowBackup="true"
@@ -13,12 +24,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".session.WorkoutActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".session.RestAlarmReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

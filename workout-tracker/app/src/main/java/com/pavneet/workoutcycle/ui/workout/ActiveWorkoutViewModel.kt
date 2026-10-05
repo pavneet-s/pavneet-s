@@ -6,16 +6,23 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pavneet.workoutcycle.WorkoutCycleApp
+import com.pavneet.workoutcycle.data.CompletedSet
 import com.pavneet.workoutcycle.data.WorkoutRepository
+import com.pavneet.workoutcycle.domain.AppSettings
 import com.pavneet.workoutcycle.domain.Exercise
-import com.pavneet.workoutcycle.domain.WorkoutCycle
+import com.pavneet.workoutcycle.domain.LoggedSet
+import com.pavneet.workoutcycle.domain.SetEntry
+import com.pavneet.workoutcycle.domain.WeightUnit
+import com.pavneet.workoutcycle.session.WorkoutController
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface ActiveWorkoutUiState {
@@ -33,61 +40,109 @@ sealed interface ActiveWorkoutUiState {
         val roundPosition: Int,
         val setsCompleted: Int,
         val roundsCompleted: Int,
+        /** What Done will log for [current]: the last set's values unless edited. */
+        val entry: SetEntry,
+        val unit: WeightUnit,
+        /** The most recent set of [current], for the "Last:" hint. */
+        val lastSet: LoggedSet?,
+        /** End of the current rest (epoch ms). The screen compares it with the clock. */
+        val restEndsAt: Long?,
+        val restSeconds: Int,
     ) : ActiveWorkoutUiState
 }
 
 /** One-off event for the "Push-ups done · Undo" snackbar. */
-data class CompletedSet(val exerciseName: String)
+data class CompletedSetEvent(val exerciseName: String)
 
-class ActiveWorkoutViewModel(private val repository: WorkoutRepository) : ViewModel() {
+class ActiveWorkoutViewModel(
+    private val repository: WorkoutRepository,
+    private val controller: WorkoutController,
+) : ViewModel() {
 
-    val uiState: StateFlow<ActiveWorkoutUiState> = repository.cycle
-        .map { it.toUiState() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ActiveWorkoutUiState.Loading)
+    /** Weight and reps edited on screen but not logged yet, per exercise. */
+    private val drafts = MutableStateFlow<Map<Long, SetEntry>>(emptyMap())
 
-    private val completions = Channel<CompletedSet>(Channel.CONFLATED)
-    val completedSets: Flow<CompletedSet> = completions.receiveAsFlow()
+    val uiState: StateFlow<ActiveWorkoutUiState> = combine(
+        repository.cycle,
+        repository.settings,
+        repository.lastSets,
+        drafts,
+    ) { cycle, settings, lastSets, drafts ->
+        val exercise = cycle.current ?: return@combine ActiveWorkoutUiState.Empty
+        val lastSet = lastSets[exercise.id]
+        // Only carry the weight over if it was logged in the unit in use now.
+        val prefill = SetEntry(weight = lastSet?.weight?.takeIf { lastSet?.unit == settings.weightUnit }, reps = lastSet?.reps)
+        ActiveWorkoutUiState.Active(
+            current = exercise,
+            upNext = checkNotNull(cycle.upNext),
+            rotation = cycle.activeExercises,
+            roundPosition = cycle.roundPosition,
+            setsCompleted = cycle.setsCompleted,
+            roundsCompleted = cycle.roundsCompleted,
+            entry = drafts[exercise.id] ?: prefill,
+            unit = settings.weightUnit,
+            lastSet = lastSet,
+            restEndsAt = cycle.restEndsAt,
+            restSeconds = settings.restSeconds,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ActiveWorkoutUiState.Loading)
 
-    private var undoSnapshot: WorkoutCycle? = null
+    /** `null` until loaded, so the screen doesn't act on defaults. */
+    val settings: StateFlow<AppSettings?> = repository.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val completions = Channel<CompletedSetEvent>(Channel.CONFLATED)
+    val completedSets: Flow<CompletedSetEvent> = completions.receiveAsFlow()
+
+    private var undoable: CompletedSet? = null
+
+    /** Keeps the workout notification (and the watch's Done button) up while training. */
+    fun onScreenShown() = controller.markActive()
+
+    fun onEntryChange(exerciseId: Long, entry: SetEntry) {
+        drafts.update { it + (exerciseId to entry) }
+    }
 
     /** [exerciseId] is the exercise the user saw on screen, which makes repeat taps harmless. */
-    fun onSetCompleted(exerciseId: Long) {
+    fun onSetCompleted(exerciseId: Long, entry: SetEntry) {
         viewModelScope.launch {
-            val before = repository.completeSet(exerciseId) ?: return@launch
-            val finished = before.current ?: return@launch
-            undoSnapshot = before
-            completions.send(CompletedSet(finished.name))
+            val completed = controller.completeSet(exerciseId, entry) ?: return@launch
+            drafts.update { it - exerciseId }
+            undoable = completed
+            completions.send(CompletedSetEvent(completed.exerciseName))
         }
     }
 
     fun onUndo() {
-        val snapshot = undoSnapshot ?: return
-        undoSnapshot = null
-        viewModelScope.launch { repository.undo(snapshot) }
+        val completed = undoable ?: return
+        undoable = null
+        viewModelScope.launch { controller.undo(completed) }
+    }
+
+    fun onSkipRest() {
+        viewModelScope.launch { controller.skipRest() }
+    }
+
+    fun onExtendRest() {
+        viewModelScope.launch { controller.extendRest() }
     }
 
     fun onRestart() {
-        undoSnapshot = null
-        viewModelScope.launch { repository.restart() }
+        undoable = null
+        viewModelScope.launch { controller.restart() }
     }
 
-    private fun WorkoutCycle.toUiState(): ActiveWorkoutUiState {
-        val exercise = current ?: return ActiveWorkoutUiState.Empty
-        return ActiveWorkoutUiState.Active(
-            current = exercise,
-            upNext = checkNotNull(upNext),
-            rotation = activeExercises,
-            roundPosition = roundPosition,
-            setsCompleted = setsCompleted,
-            roundsCompleted = roundsCompleted,
-        )
+    /** Remember that we asked, and refresh the notification in case it was just allowed. */
+    fun onNotificationPermissionResult() {
+        controller.markActive()
+        viewModelScope.launch { repository.updateSettings { it.copy(notificationPrompted = true) } }
     }
 
     companion object {
         val Factory = viewModelFactory {
             initializer {
-                val app = this[APPLICATION_KEY] as WorkoutCycleApp
-                ActiveWorkoutViewModel(app.container.workoutRepository)
+                val container = (this[APPLICATION_KEY] as WorkoutCycleApp).container
+                ActiveWorkoutViewModel(container.workoutRepository, container.workoutController)
             }
         }
     }

@@ -11,6 +11,11 @@ Built with Kotlin, Jetpack Compose and Material 3, and tuned for a modern phone 
 | Screen | What it does |
 | --- | --- |
 | **Active workout** | Shows the current exercise in large type with a looping **cable-machine animation** of the movement and where to set the pulley. It also shows what's up next and progress through the round (segments, round number, sets done). The Done button sits in thumb reach with a haptic confirm. A snackbar offers **Undo** after each set, and the screen stays awake. |
+| **Weight and reps** | Steppers above the Done button, **prefilled from last time** ("Last: 35 lb × 12 reps · Monday"). Tap a value to type it. Units are lb, kg or stack plate number. Done logs the set. |
+| **Rest timer** | After Done, a countdown with **+15 s** and **Skip rest** while the next exercise and its pulley height are already on screen. An exact alarm fires a **rest-over alert**, even with the screen off. |
+| **Machine setup** | Tap an exercise on the manage screen to rename it and save its **attachment** (rope, handle, bars, ankle strap), **pulley position** and **setup notes**. They show under the animation, e.g. "Rope · Notch 12 · Two steps back". |
+| **History** | Day streak, days this week and total sets. A 12-week **training calendar**, a **weight progress chart** per exercise, and recent workouts. |
+| **Lock screen and Galaxy Watch** | A workout notification shows the current exercise with a **Done** button, or the rest countdown with **Skip rest / +15 s**. Wear OS mirrors phone notifications and their buttons to a paired watch, so a Galaxy Watch can finish a set without a watch app. |
 | **Manage exercises** | Add exercises, switch one off to **skip** it without losing its slot, delete it, or **drag the handle to reorder**. Each exercise has a chip that opens a **picker with live previews** of every cable movement. TalkBack users get *Move up / Move down* actions instead of dragging. |
 
 ## Installing on a phone without a computer
@@ -101,7 +106,13 @@ How the cyclical list behaves:
 | Table | Columns | Notes |
 | --- | --- | --- |
 | `cycles` | `id`, `name`, `current_exercise_id`, `sets_completed`, `rounds_completed` | One row today, seeded on first launch. |
-| `exercises` | `id`, `cycle_id` → `cycles.id`, `name`, `position`, `is_active`, `animation` | `position` is rewritten on each save. `animation` is `NULL` (guess from the name), `OFF`, or a movement name; added in version 2. |
+| `exercises` | `id`, `cycle_id` → `cycles.id`, `name`, `position`, `is_active`, `animation`, `attachment`, `pulley_position`, `setup_note` | `position` is rewritten on each save. `animation` is `NULL` (guess from the name), `OFF`, or a movement name; added in version 2. The setup columns were added in version 3. |
+| `set_logs` | `id`, `exercise_id` → `exercises.id` (set to `NULL` on delete), `exercise_name`, `weight`, `weight_unit`, `reps`, `completed_at` | One row per completed set. The name is copied in so history survives renames and deletes. Version 3. |
+| `settings` | `rest_enabled`, `rest_seconds`, `weight_unit`, `workout_notification`, `notification_prompted` | A single row, missing until something is changed; the defaults live in `AppSettings`. Version 3. |
+
+`cycles` also gained `rest_ends_at` in version 3. Each version bump has a hand-written
+migration in `WorkoutDatabase`, and the emulator job upgrades from real older releases to
+prove them.
 
 The repository observes a `@Transaction` query that returns `CycleWithExercises` (`@Embedded` cycle plus a `@Relation` to its exercises). A change to both tables is therefore never seen half-applied. Keying exercises by `cycle_id` also leaves room for several routines later, such as "Push day" and "Pull day".
 
@@ -122,6 +133,24 @@ the handle moves away from the pulley, and there's a short squeeze at the top of
   those on a Compose `Canvas`, coloured from the Material theme, and redraws in the draw phase
   only. Being plain Kotlin, the geometry is unit-tested on the JVM: limbs keep their length,
   feet stay on the floor, and nothing leaves the frame or passes through the machine.
+
+## Rest timer, notifications and the watch
+
+`session/WorkoutController` is the one place a set gets completed, whether from the app's Done
+button, the notification's Done button (on the phone or a paired watch) or the rest alarm:
+
+- **Completing a set** logs it, advances the cycle and starts a rest of `settings.rest_seconds`.
+  This happens in one transaction, in `WorkoutRepository.completeSet`. The notification and
+  watch path pass no weight or reps, so they repeat the exercise's last values.
+- **The rest alarm** is an exact `AlarmManager` alarm (`USE_EXACT_ALARM`, granted at install on
+  Android 13+). It lets `RestAlarmReceiver` end the rest and post a high-priority "Rest over"
+  alert that vibrates the phone and the watch.
+- **The workout notification** is rebuilt by `WorkoutNotificationSync` whenever the cycle,
+  settings or last sets change. It is deliberately *not* ongoing, because Wear OS doesn't
+  mirror ongoing notifications. It disappears an hour after the last activity
+  (`setTimeoutAfter`).
+- **Without notification permission** the rest still counts down in the app, which buzzes when it
+  ends while the screen is up.
 
 ## Drag and drop
 
@@ -147,8 +176,11 @@ app/src/main/java/com/pavneet/workoutcycle/
 ├── WorkoutCycleApp.kt          Application + AppContainer (manual DI)
 ├── MainActivity.kt             edge-to-edge, theme, nav host
 ├── domain/
-│   ├── WorkoutCycle.kt         Exercise + WorkoutCycle: all cycle rules
+│   ├── WorkoutCycle.kt         Exercise + WorkoutCycle: all cycle rules, rest state
+│   ├── Training.kt             weights, sets, machine setup, settings
+│   ├── WorkoutHistory.kt       streaks, sessions and progress from the set log
 │   └── CableMovement.kt        cable movements, pulley heights, name guessing
+├── session/                    WorkoutController, rest alarm, notifications (watch Done)
 ├── data/
 │   ├── WorkoutRepository.kt    load → transform → save, Flow<WorkoutCycle>
 │   └── local/                  Room entities, DAO, database (+ default seed)
@@ -157,12 +189,15 @@ app/src/main/java/com/pavneet/workoutcycle/
     ├── cable/                  pose engine, drawing and the Compose animation
     ├── theme/Theme.kt
     ├── workout/                Active workout screen + ViewModel
-    └── manage/                 Manage exercises screen, animation picker + ViewModel
+    ├── manage/                 Manage exercises, exercise editor, animation picker
+    ├── history/                History screen, training calendar, progress charts
+    └── settings/               Settings screen
 ```
 
 ## Ideas for next steps
 
-- A `set_log` table (exercise, timestamp, reps or weight) for history and streaks.
-- An optional rest timer between movements, with a notification.
 - Several named routines, which the `cycle_id` foreign key already allows.
-- A Wear OS tile or Galaxy Watch complication for the Done button.
+- A session goal (e.g. three rounds) with a summary at the end.
+- Export or backup of the set log.
+- A dedicated Wear OS app or tile. It needs a computer to install on the watch, unlike the
+  notification-based Done button.

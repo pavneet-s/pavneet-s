@@ -32,7 +32,8 @@ interface WorkoutDao {
         UPDATE cycles
         SET current_exercise_id = :currentExerciseId,
             sets_completed = :setsCompleted,
-            rounds_completed = :roundsCompleted
+            rounds_completed = :roundsCompleted,
+            rest_ends_at = :restEndsAt
         WHERE id = :cycleId
         """,
     )
@@ -41,5 +42,36 @@ interface WorkoutDao {
         currentExerciseId: Long?,
         setsCompleted: Int,
         roundsCompleted: Int,
+        restEndsAt: Long?,
     )
+
+    @Insert
+    suspend fun insertLog(log: SetLogEntity): Long
+
+    @Query("DELETE FROM set_logs WHERE id = :logId")
+    suspend fun deleteLog(logId: Long)
+
+    @Query("SELECT * FROM set_logs ORDER BY completed_at, id")
+    fun observeLogs(): Flow<List<SetLogEntity>>
+
+    @Query("SELECT * FROM set_logs WHERE exercise_id = :exerciseId ORDER BY completed_at DESC, id DESC LIMIT 1")
+    suspend fun lastLogFor(exerciseId: Long): SetLogEntity?
+
+    /** The most recent set for every exercise that still exists. */
+    @Query(
+        """
+        SELECT * FROM set_logs
+        WHERE id IN (SELECT MAX(id) FROM set_logs WHERE exercise_id IS NOT NULL GROUP BY exercise_id)
+        """,
+    )
+    fun observeLatestLogs(): Flow<List<SetLogEntity>>
+
+    @Query("SELECT * FROM settings WHERE id = ${SettingsEntity.SINGLETON_ID}")
+    fun observeSettings(): Flow<SettingsEntity?>
+
+    @Query("SELECT * FROM settings WHERE id = ${SettingsEntity.SINGLETON_ID}")
+    suspend fun getSettings(): SettingsEntity?
+
+    @Upsert
+    suspend fun upsertSettings(settings: SettingsEntity)
 }

@@ -11,6 +11,7 @@ data class Exercise(
     val name: String,
     val isActive: Boolean = true,
     val animation: AnimationSetting = AnimationSetting.Auto,
+    val setup: MachineSetup = MachineSetup(),
 ) {
     /** The cable movement to animate, or `null` for none. */
     val movement: CableMovement?
@@ -34,6 +35,8 @@ data class WorkoutCycle(
     val currentExerciseId: Long? = null,
     val setsCompleted: Int = 0,
     val roundsCompleted: Int = 0,
+    /** When the current rest period ends (epoch ms), or `null` when not resting. */
+    val restEndsAt: Long? = null,
 ) {
     /** The exercises you actually cycle through, in order. */
     val activeExercises: List<Exercise> = exercises.filter { it.isActive }
@@ -94,6 +97,28 @@ data class WorkoutCycle(
         return copy(exercises = reordered + exercises.filterNot { it.id in idsInOrder }).normalized()
     }
 
+    /** Renames an exercise; blank names are ignored. Logged history keeps the old name. */
+    fun rename(exerciseId: Long, name: String): WorkoutCycle {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return this
+        return copy(exercises = exercises.map { if (it.id == exerciseId) it.copy(name = trimmed) else it })
+    }
+
+    /** Saves how the machine is set up for [exerciseId]. */
+    fun setSetup(exerciseId: Long, setup: MachineSetup): WorkoutCycle = copy(
+        exercises = exercises.map { if (it.id == exerciseId) it.copy(setup = setup) else it },
+    )
+
+    fun isResting(now: Long): Boolean = restEndsAt != null && restEndsAt > now
+
+    fun startRest(endsAt: Long): WorkoutCycle = copy(restEndsAt = endsAt)
+
+    fun endRest(): WorkoutCycle = if (restEndsAt == null) this else copy(restEndsAt = null)
+
+    /** Adds time to a rest that's still running; a finished rest stays finished. */
+    fun extendRest(byMillis: Long, now: Long): WorkoutCycle =
+        if (isResting(now)) copy(restEndsAt = restEndsAt!! + byMillis) else this
+
     /** Chooses how [exerciseId] is animated; the rotation itself is unchanged. */
     fun setAnimation(exerciseId: Long, animation: AnimationSetting): WorkoutCycle = copy(
         exercises = exercises.map { if (it.id == exerciseId) it.copy(animation = animation) else it },
@@ -104,13 +129,18 @@ data class WorkoutCycle(
         currentExerciseId = activeExercises.firstOrNull()?.id,
         setsCompleted = 0,
         roundsCompleted = 0,
+        restEndsAt = null,
     )
 
-    /** Rolls the pointer and counters back to [snapshot] (undo), keeping the current exercise list. */
+    /**
+     * Rolls the pointer and counters back to [snapshot] (undo), keeping the current exercise
+     * list. Any rest is cancelled, since it belonged to the set being undone.
+     */
     fun restoreProgress(snapshot: WorkoutCycle): WorkoutCycle = copy(
         currentExerciseId = snapshot.currentExerciseId,
         setsCompleted = snapshot.setsCompleted,
         roundsCompleted = snapshot.roundsCompleted,
+        restEndsAt = null,
     ).normalized()
 
     /** Pins the stored pointer to the resolved [current] so what's saved matches what's shown. */

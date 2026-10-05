@@ -9,6 +9,7 @@ import com.pavneet.workoutcycle.WorkoutCycleApp
 import com.pavneet.workoutcycle.data.WorkoutRepository
 import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.Exercise
+import com.pavneet.workoutcycle.domain.MachineSetup
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -40,6 +41,10 @@ class ManageCycleViewModel(private val repository: WorkoutRepository) : ViewMode
 
     fun setExerciseActive(exerciseId: Long, active: Boolean) {
         viewModelScope.launch { repository.setExerciseActive(exerciseId, active) }
+    }
+
+    fun updateExercise(exerciseId: Long, name: String, setup: MachineSetup) {
+        viewModelScope.launch { repository.updateExercise(exerciseId, name, setup) }
     }
 
     fun setExerciseAnimation(exerciseId: Long, animation: AnimationSetting) {

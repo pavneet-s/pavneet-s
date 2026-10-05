@@ -53,8 +53,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # The first release installed on a phone (database version 1). Upgrades are tested from it.
-      BASELINE_REF: 2aafd6142b302d204f5af4d83c659328796235d3
+      # Releases that may be on a phone, oldest first: the first one (database version 1) and the
+      # cable-animation one (version 2). The new build is installed over each in turn.
+      BASELINE_REFS: >-
+        2aafd6142b302d204f5af4d83c659328796235d3
+        75de3f06c8a42701650eb8bad417e4871697c486
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,11 +74,15 @@ jobs:
         with:
           name: workout-cycle-apk
 
-      - name: Build the previous release
+      - name: Build the previous releases
         run: |
-          git worktree add "$RUNNER_TEMP/baseline" "$BASELINE_REF"
-          (cd "$RUNNER_TEMP/baseline/workout-tracker" && ./gradlew :app:assembleDebug)
-          cp "$RUNNER_TEMP/baseline/workout-tracker/app/build/outputs/apk/debug/app-debug.apk" baseline.apk
+          i=0
+          for ref in $BASELINE_REFS; do
+            i=$((i + 1))
+            git worktree add "$RUNNER_TEMP/baseline-$i" "$ref"
+            (cd "$RUNNER_TEMP/baseline-$i/workout-tracker" && ./gradlew :app:assembleDebug)
+            cp "$RUNNER_TEMP/baseline-$i/workout-tracker/app/build/outputs/apk/debug/app-debug.apk" "baseline-$i.apk"
+          done
 
       - name: Enable KVM for the emulator
         run: |
@@ -90,7 +97,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: bash workout-tracker/scripts/smoke-test.sh baseline.apk workout-cycle.apk screenshots
+          script: bash workout-tracker/scripts/smoke-test.sh workout-cycle.apk screenshots baseline-1.apk baseline-2.apk
 
       - name: Upload screenshots
         if: always()

@@ -1,6 +1,7 @@
 package com.pavneet.workoutcycle.ui.manage
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,8 +68,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pavneet.workoutcycle.R
 import com.pavneet.workoutcycle.domain.AnimationSetting
 import com.pavneet.workoutcycle.domain.Exercise
+import com.pavneet.workoutcycle.domain.MachineSetup
 import com.pavneet.workoutcycle.domain.WorkoutCycle
 import com.pavneet.workoutcycle.ui.cable.labelRes
+import com.pavneet.workoutcycle.ui.setupSummary
 import com.pavneet.workoutcycle.ui.theme.WorkoutCycleTheme
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -87,6 +90,7 @@ fun ManageCycleRoute(
         onExerciseActiveChange = viewModel::setExerciseActive,
         onReorder = viewModel::reorder,
         onExerciseAnimationChange = viewModel::setExerciseAnimation,
+        onExerciseEdit = viewModel::updateExercise,
     )
 }
 
@@ -100,9 +104,11 @@ fun ManageCycleScreen(
     onExerciseActiveChange: (exerciseId: Long, active: Boolean) -> Unit,
     onReorder: (orderedIds: List<Long>) -> Unit,
     onExerciseAnimationChange: (exerciseId: Long, animation: AnimationSetting) -> Unit,
+    onExerciseEdit: (exerciseId: Long, name: String, setup: MachineSetup) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var animationPickerFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editorFor by rememberSaveable { mutableStateOf<Long?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -143,6 +149,7 @@ fun ManageCycleScreen(
                     onActiveChange = onExerciseActiveChange,
                     onReorder = onReorder,
                     onAnimationClick = { exerciseId -> animationPickerFor = exerciseId },
+                    onEditClick = { exerciseId -> editorFor = exerciseId },
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -160,6 +167,14 @@ fun ManageCycleScreen(
             selected = exercise.movement,
             onSelect = { animation -> onExerciseAnimationChange(exercise.id, animation) },
             onDismiss = { animationPickerFor = null },
+        )
+    }
+
+    uiState.exercises.firstOrNull { it.id == editorFor }?.let { exercise ->
+        ExerciseEditorSheet(
+            exercise = exercise,
+            onSave = { name, setup -> onExerciseEdit(exercise.id, name, setup) },
+            onDismiss = { editorFor = null },
         )
     }
 }
@@ -207,6 +222,7 @@ private fun ReorderableExerciseList(
     onActiveChange: (exerciseId: Long, active: Boolean) -> Unit,
     onReorder: (orderedIds: List<Long>) -> Unit,
     onAnimationClick: (exerciseId: Long) -> Unit,
+    onEditClick: (exerciseId: Long) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -266,6 +282,7 @@ private fun ReorderableExerciseList(
                     onActiveChange = { active -> onActiveChange(exercise.id, active) },
                     onRemove = { onRemove(exercise.id) },
                     onAnimationClick = { onAnimationClick(exercise.id) },
+                    onEditClick = { onEditClick(exercise.id) },
                     // Merged so TalkBack focuses the row as one item and offers the move actions.
                     modifier = Modifier.semantics(mergeDescendants = true) {
                         customActions = listOf(
@@ -289,6 +306,7 @@ private fun ExerciseRow(
     onActiveChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
     onAnimationClick: () -> Unit,
+    onEditClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "dragElevation")
@@ -315,6 +333,7 @@ private fun ExerciseRow(
             Column(
                 Modifier
                     .weight(1f)
+                    .clickable(onClickLabel = stringResource(R.string.edit_exercise_action), onClick = onEditClick)
                     .padding(top = 10.dp, bottom = 2.dp)
                     .alpha(if (exercise.isActive) 1f else 0.5f),
             ) {
@@ -333,6 +352,14 @@ private fun ExerciseRow(
                     !exercise.isActive -> Text(
                         text = stringResource(R.string.status_skipped),
                         style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+                setupSummary(exercise.setup)?.let { setup ->
+                    Text(
+                        text = setup,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 val animationLabel = exercise.movement?.let { stringResource(it.labelRes) }
@@ -379,6 +406,7 @@ private fun ManageCycleScreenPreview() {
             onExerciseActiveChange = { _, _ -> },
             onReorder = {},
             onExerciseAnimationChange = { _, _ -> },
+            onExerciseEdit = { _, _, _ -> },
         )
     }
 }
